@@ -1,0 +1,170 @@
+rules_version = '2';
+// Shella: group expense splitter.
+// Model: trips/{t} (unguessable id) -> people/{p1..p20}, members/{uid} -> {person}, expenses/{id}.
+// A name (person) is locked to one browser (anonymous uid). Only the trip maker can unlock it.
+// An expense belongs to the person who PAID it. The maker can only soft-delete/restore and unlock.
+// Everything closes 14 days after the trip's last activity. Nothing is ever hard-deleted from a client.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function tripPath(t) { return /databases/$(database)/documents/trips/$(t); }
+    function personPath(t, p) { return /databases/$(database)/documents/trips/$(t)/people/$(p); }
+    function memberPath(t, u) { return /databases/$(database)/documents/trips/$(t)/members/$(u); }
+    function alive(tripData) { return request.time < tripData.lastActivity + duration.value(14, 'd'); }
+
+    function isMember(t) { return signedIn() && exists(memberPath(t, request.auth.uid)); }
+    function myPerson(t) { return get(memberPath(t, request.auth.uid)).data.person; }
+    function isMaker(t) { return signedIn() && get(tripPath(t)).data.maker == request.auth.uid; }
+
+    function str(s, min, max) { return s is string && s.size() >= min && s.size() <= max; }
+    function personId(p) { return p is string && p.matches('^p([1-9]|1[0-9]|20)$'); }
+    function validAvatar(a) {
+      return a is map && a.keys().hasOnly(['k', 'v']) && a.keys().hasAll(['k', 'v'])
+        && a.k in ['dice', 'photo'] && str(a.v, 1, 60000);
+    }
+
+    match /trips/{t} {
+      allow get: if signedIn() && alive(resource.data);
+      allow list: if false;
+
+      allow create: if signedIn()
+        && t.matches('^[A-Za-z0-9_-]{20,40}$')
+        && request.resource.data.keys().hasOnly(['name', 'currency', 'maker', 'open', 'createdAt', 'lastActivity'])
+        && request.resource.data.keys().hasAll(['name', 'currency', 'maker', 'open', 'createdAt', 'lastActivity'])
+        && str(request.resource.data.name, 1, 40)
+        && request.resource.data.currency in ['EGP', 'USD', 'EUR', 'SAR', 'AED', 'KWD', 'QAR', 'GBP', 'TRY', 'JOD']
+        && request.resource.data.maker == request.auth.uid
+        && request.resource.data.open == true
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.lastActivity == request.time;
+
+      // Members may only bump lastActivity. The maker may also rename and open/close joining.
+      allow update: if isMember(t) && alive(resource.data)
+        && request.resource.data.lastActivity == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+             resource.data.maker == request.auth.uid ? ['lastActivity', 'open', 'name'] : ['lastActivity'])
+        && str(request.resource.data.name, 1, 40)
+        && request.resource.data.open is bool;
+
+      allow delete: if false;
+
+      match /people/{p} {
+        // Anyone holding the link sees the names, so they can pick theirs.
+        allow read: if signedIn() && alive(get(tripPath(t)).data);
+
+        // Only the maker adds people, only while joining is open. At most 20 (ids p1..p20).
+        // A new person is unclaimed, except the maker's own person, claimed in the same batch.
+        allow create: if signedIn() && personId(p)
+          && getAfter(tripPath(t)).data.maker == request.auth.uid
+          && getAfter(tripPath(t)).data.open == true
+          && alive(getAfter(tripPath(t)).data)
+          && request.resource.data.keys().hasOnly(['name', 'avatar', 'instapay', 'uid'])
+          && request.resource.data.keys().hasAll(['name', 'avatar', 'instapay', 'uid'])
+          && str(request.resource.data.name, 1, 24)
+          && validAvatar(request.resource.data.avatar)
+          && str(request.resource.data.instapay, 0, 60)
+          && (request.resource.data.uid == null
+              || (request.resource.data.uid == request.auth.uid
+                  && getAfter(memberPath(t, request.auth.uid)).data.person == p));
+
+        allow update: if signedIn() && alive(get(tripPath(t)).data) && (
+          // Claim: an unclaimed name, joining open, and a matching member doc in the same batch.
+          (resource.data.uid == null
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid'])
+            && get(tripPath(t)).data.open == true
+            && getAfter(memberPath(t, request.auth.uid)).data.person == p)
+          ||
+          // The person themself edits their avatar and InstaPay handle.
+          (resource.data.uid == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['avatar', 'instapay'])
+            && validAvatar(request.resource.data.avatar)
+            && str(request.resource.data.instapay, 0, 60))
+          ||
+          // The maker renames, changes the avatar, or unlocks (uid -> null, member doc removed in the same batch).
+          (isMaker(t)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'avatar', 'uid'])
+            && str(request.resource.data.name, 1, 24)
+            && validAvatar(request.resource.data.avatar)
+            && (request.resource.data.uid == resource.data.uid
+                || (request.resource.data.uid == null
+                    && !existsAfter(memberPath(t, resource.data.uid)))))
+        );
+
+        allow delete: if false;
+      }
+
+      match /members/{u} {
+        // Only you can see your own membership.
+        allow get: if signedIn() && request.auth.uid == u;
+        allow list: if false;
+
+        // Join: one name per browser; the name must be claimed by you in the same batch.
+        allow create: if signedIn() && request.auth.uid == u
+          && request.resource.data.keys().hasOnly(['person'])
+          && personId(request.resource.data.person)
+          && getAfter(personPath(t, request.resource.data.person)).data.uid == u
+          && getAfter(tripPath(t)).data.open == true
+          && alive(getAfter(tripPath(t)).data);
+
+        allow update: if false;
+
+        // Unlock by the maker (the person is released in the same batch).
+        allow delete: if isMaker(t)
+          && getAfter(personPath(t, resource.data.person)).data.uid == null;
+      }
+
+      match /expenses/{e} {
+        allow read: if isMember(t) && alive(get(tripPath(t)).data);
+
+        allow create: if isMember(t) && alive(get(tripPath(t)).data)
+          && request.resource.data.keys().hasOnly(['type', 'amount', 'desc', 'cat', 'paidBy', 'split', 'by', 'ts', 'deleted'])
+          && request.resource.data.keys().hasAll(['type', 'amount', 'desc', 'cat', 'paidBy', 'split', 'by', 'ts', 'deleted'])
+          && validExpense(request.resource.data)
+          && request.resource.data.by == myPerson(t)
+          && request.resource.data.ts == request.time
+          && request.resource.data.deleted == false;
+
+        allow update: if isMember(t) && alive(get(tripPath(t)).data)
+          && request.resource.data.keys().hasOnly(['type', 'amount', 'desc', 'cat', 'paidBy', 'split', 'by', 'ts', 'deleted', 'editedBy', 'editedAt'])
+          && validExpense(request.resource.data)
+          && request.resource.data.editedBy == myPerson(t)
+          && request.resource.data.editedAt == request.time
+          && (
+            // The payer owns the expense: edits the content or deletes/restores it.
+            (myPerson(t) == resource.data.paidBy
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['amount', 'desc', 'cat', 'split', 'deleted', 'editedBy', 'editedAt']))
+            ||
+            // The maker can only delete/restore.
+            (isMaker(t)
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['deleted', 'editedBy', 'editedAt']))
+          );
+
+        allow delete: if false;
+
+        function validExpense(d) {
+          return d.type in ['expense', 'settle']
+            && (d.amount is int || d.amount is float) && d.amount > 0 && d.amount < 100000000
+            && str(d.desc, 0, 60)
+            && str(d.cat, 1, 20)
+            && personId(d.paidBy)
+            && exists(personPath(t, d.paidBy))
+            && d.split is list && d.split.size() >= 1 && d.split.size() <= 20
+            && d.deleted is bool;
+        }
+      }
+    }
+
+    // Trips created per day (counter only; nobody reads it from the app).
+    match /stats/{day} {
+      allow read: if false;
+      allow create: if signedIn() && day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.keys().hasOnly(['count']) && request.resource.data.count == 1;
+      allow update: if signedIn()
+        && request.resource.data.keys().hasOnly(['count']) && request.resource.data.count == resource.data.count + 1;
+    }
+  }
+}
