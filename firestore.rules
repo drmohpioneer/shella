@@ -91,6 +91,7 @@ service cloud.firestore {
             && validAvatar(request.resource.data.avatar)
             && (request.resource.data.uid == resource.data.uid
                 || (request.resource.data.uid == null
+                    && resource.data.uid != request.auth.uid
                     && !existsAfter(memberPath(t, resource.data.uid)))))
         );
 
@@ -113,7 +114,8 @@ service cloud.firestore {
         allow update: if false;
 
         // Unlock by the maker (the person is released in the same batch).
-        allow delete: if isMaker(t)
+        // The maker can never drop their own membership, so they can't take over someone else's name.
+        allow delete: if isMaker(t) && u != request.auth.uid
           && getAfter(personPath(t, resource.data.person)).data.uid == null;
       }
 
@@ -155,6 +157,8 @@ service cloud.firestore {
             && personId(d.paidBy)
             && exists(personPath(t, d.paidBy))
             && d.split is list && d.split.size() >= 1 && d.split.size() <= 20
+            && d.split.hasOnly(['p1','p2','p3','p4','p5','p6','p7','p8','p9','p10',
+                                'p11','p12','p13','p14','p15','p16','p17','p18','p19','p20'])
             && d.deleted is bool;
         }
       }
