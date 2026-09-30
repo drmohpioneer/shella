@@ -500,9 +500,11 @@ document.addEventListener("click", (e) => { if (e.target.closest("[data-lang]"))
 
 const randId = (bytes) => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(bytes)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const diceCache = new Map();
+const PHOTO_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/;
 function avatarSrc(a) {
-  if (!a) return "";
-  if (a.k === "photo") return a.v;
+  if (!a || typeof a.v !== "string") return "";
+  // Only our own shrunk photos are shown; anything else (remote URLs, markup) is ignored.
+  if (a.k === "photo") return PHOTO_RE.test(a.v) ? a.v : "";
   if (!diceCache.has(a.v)) diceCache.set(a.v, createAvatar(lorelei, { seed: a.v }).toDataUri());
   return diceCache.get(a.v);
 }
@@ -571,7 +573,7 @@ const tripLink = (id) => `${location.origin}${location.pathname}#t=${id}`;
 const nameOf = (pid) => people[pid]?.name || "?";
 function face(pid, cls = "") {
   const p = people[pid];
-  return `<img class="${cls}" src="${avatarSrc(p?.avatar)}" alt="${esc(p?.name || "")}" style="--c:${colorOf(pid)}">`;
+  return `<img class="${cls}" src="${esc(avatarSrc(p?.avatar))}" alt="${esc(p?.name || "")}" style="--c:${colorOf(pid)}">`;
 }
 function rememberTrip() {
   let list = [];
@@ -916,7 +918,7 @@ function drawMenu(open) {
   const p = people[me]; if (!p) return;
   const av = pendingAvatar || p.avatar;
   $("menuTitle").textContent = t("myProfile");
-  let h = `<div class="prow"><div class="pav" style="--c:${colorOf(me)}"><img src="${avatarSrc(av)}" alt=""></div>
+  let h = `<div class="prow"><div class="pav" style="--c:${colorOf(me)}"><img src="${esc(avatarSrc(av))}" alt=""></div>
       <button class="mbtn" data-act="shuffle">🎲 ${t("shuffle")}</button><button class="mbtn" data-act="photo">📷 ${t("photo")}</button></div>
     <input class="field" id="ipIn" maxlength="60" autocomplete="off" placeholder="${esc(t("instapayPh"))}" value="${esc(p.instapay || "")}">
     <div class="note" style="text-align:start">${t("instapay")}</div>
@@ -1040,7 +1042,7 @@ function resetCreate() {
 function drawRows() {
   $("cCount").textContent = rows.length;
   $("cRows").innerHTML = rows.map((r, i) => `<div class="prow" data-i="${i}">
-    <button class="pav" data-act="shuffle" style="--c:${COLORS[i % COLORS.length]}"><img src="${avatarSrc(r.avatar)}" alt=""></button>
+    <button class="pav" data-act="shuffle" style="--c:${COLORS[i % COLORS.length]}"><img src="${esc(avatarSrc(r.avatar))}" alt=""></button>
     <input class="field" data-act="name" maxlength="24" autocomplete="off" placeholder="${esc(t("namePh"))} ${i + 1}" value="${esc(r.name)}">
     <button class="cam" data-act="photo">📷</button>
     <button class="mebtn${i === meIdx ? " on" : ""}" data-act="me">${t("thisIsMe")}</button></div>`).join("");

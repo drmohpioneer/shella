@@ -21,7 +21,9 @@ service cloud.firestore {
     function personId(p) { return p is string && p.matches('^p([1-9]|1[0-9]|20)$'); }
     function validAvatar(a) {
       return a is map && a.keys().hasOnly(['k', 'v']) && a.keys().hasAll(['k', 'v'])
-        && a.k in ['dice', 'photo'] && str(a.v, 1, 60000);
+        && a.k in ['dice', 'photo'] && str(a.v, 1, 60000)
+        && (a.k == 'dice' ? a.v.matches('^[A-Za-z0-9_-]{1,32}$')
+                          : a.v.matches('^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$'));
     }
 
     match /trips/{t} {
