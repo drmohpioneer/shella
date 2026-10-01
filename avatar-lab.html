@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Shella face maker (test)</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#06202c">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#06202c;--card:rgba(255,255,255,.07);--card2:rgba(255,255,255,.11);--line:rgba(255,255,255,.12);--text:#eef8f9;--muted:#8fb4bc;--teal:#2ee6c9;--sun:#ffc861;--coral:#ff7a59}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:Outfit,system-ui,sans-serif;color:var(--text);background:radial-gradient(120% 60% at 50% 0%,#0f5566 0%,#0b3a4a 35%,var(--bg) 75%) fixed,var(--bg);min-height:100vh}
+.wrap{max-width:520px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 18px) 16px 60px}
+h1{font-family:"Baloo 2";font-size:30px;margin:0 0 4px;text-align:center}
+.sub{color:var(--muted);text-align:center;margin:0 0 18px;font-size:14px}
+.stage{display:flex;align-items:center;justify-content:center;gap:16px}
+.big{width:180px;height:180px;border-radius:50%;background:#ffc861;overflow:hidden}
+.big img{width:100%;height:100%;display:block}
+.photo{width:84px;height:84px;border-radius:50%;object-fit:cover;border:3px solid var(--line);display:none}
+.btn{display:block;width:100%;margin-top:16px;background:linear-gradient(135deg,var(--sun),var(--coral));color:#3a1405;font-weight:800;font-size:17px;padding:15px;border:0;border-radius:18px;font-family:inherit}
+.status{text-align:center;color:var(--muted);font-size:14px;min-height:20px;margin-top:10px}
+.lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin:20px 2px 8px}
+.row{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.row::-webkit-scrollbar{display:none}
+.opt{flex-shrink:0;width:64px;height:64px;border-radius:50%;background:var(--card);border:3px solid transparent;padding:0;overflow:hidden}
+.opt img{width:100%;height:100%;display:block}
+.opt.on{border-color:var(--sun)}
+.sw{flex-shrink:0;width:40px;height:40px;border-radius:50%;border:3px solid transparent;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+.sw.on{border-color:#fff}
+.none{display:grid;place-items:center;font-size:12px;color:var(--muted);font-weight:700}
+.note{color:var(--muted);font-size:12px;text-align:center;margin-top:24px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Make your face</h1>
+  <p class="sub">Test page. Pick a photo and the app copies your skin and hair colour. Then tap to fix the rest.</p>
+  <div class="stage"><div class="big" id="big"></div><img class="photo" id="photo" alt=""></div>
+  <button class="btn" id="pick">📷 Start from my photo</button>
+  <input type="file" accept="image/*" id="file" hidden>
+  <div class="status" id="status"></div>
+
+  <div class="lbl">Skin</div><div class="row" id="skin"></div>
+  <div class="lbl">Hair colour</div><div class="row" id="hairColor"></div>
+  <div class="lbl">Hair</div><div class="row" id="top"></div>
+  <div class="lbl">Beard</div><div class="row" id="facialHair"></div>
+  <div class="lbl">Glasses</div><div class="row" id="accessories"></div>
+  <div class="lbl">Face</div><div class="row" id="mood"></div>
+  <p class="note">Your photo never leaves this phone. Only the cartoon is saved.</p>
+</div>
+<script type="module">
+import { createAvatar } from "https://cdn.jsdelivr.net/npm/@dicebear/core@9.4.2/+esm";
+import { avataaars } from "https://cdn.jsdelivr.net/npm/@dicebear/collection@9.4.2/+esm";
+
+const SKIN = ["ffdbb4", "edb98a", "d08b5b", "ae5d29", "614335"];
+const HAIRC = ["2c1b18", "4a312c", "724133", "a55728", "b58143", "d6b370", "c93305", "e8e1e1"];
+const TOPS = ["shortFlat", "shortWaved", "shortCurly", "shortRound", "theCaesar", "theCaesarAndSidePart", "sides", "frizzle", "fro", "shavedSides",
+  "curly", "straight01", "straight02", "bob", "bun", "longButNotTooLong", "bigHair", "curvy", "hijab", "turban", null];
+const BEARDS = [null, "beardLight", "beardMedium", "beardMajestic", "moustacheFancy", "moustacheMagnum"];
+const GLASSES = [null, "prescription01", "prescription02", "round", "wayfarers", "sunglasses"];
+const MOODS = [["happy", "smile", "defaultNatural"], ["default", "default", "defaultNatural"], ["wink", "twinkle", "raisedExcitedNatural"], ["squint", "tongue", "upDownNatural"], ["side", "serious", "flatNatural"], ["surprised", "screamOpen", "raisedExcited"]];
+
+const st = { skin: "d08b5b", hairColor: "2c1b18", top: "shortWaved", facialHair: null, accessories: null, mood: 0 };
+const BG = "ffc861";
+
+function svg(o) {
+  const m = MOODS[o.mood];
+  return createAvatar(avataaars, {
+    seed: "shella", backgroundColor: [BG], skinColor: [o.skin], hairColor: [o.hairColor], facialHairColor: [o.hairColor],
+    top: o.top ? [o.top] : ["shortFlat"], topProbability: o.top ? 100 : 0,
+    facialHair: o.facialHair ? [o.facialHair] : ["beardLight"], facialHairProbability: o.facialHair ? 100 : 0,
+    accessories: o.accessories ? [o.accessories] : ["round"], accessoriesProbability: o.accessories ? 100 : 0,
+    accessoriesColor: ["262e33"], hatColor: ["3c4f5c"], clothing: ["shirtCrewNeck"], clothesColor: ["25557c"],
+    eyes: [m[0]], mouth: [m[1]], eyebrows: [m[2]],
+  }).toDataUri();
+}
+const img = (src) => `<img src="${src}" alt="">`;
+function draw() {
+  document.getElementById("big").innerHTML = img(svg(st));
+  document.getElementById("skin").innerHTML = SKIN.map(c => `<button class="sw${c === st.skin ? " on" : ""}" data-k="skin" data-v="${c}" style="background:#${c}"></button>`).join("");
+  document.getElementById("hairColor").innerHTML = HAIRC.map(c => `<button class="sw${c === st.hairColor ? " on" : ""}" data-k="hairColor" data-v="${c}" style="background:#${c}"></button>`).join("");
+  const opts = (k, list) => list.map((v, i) => `<button class="opt${st[k] === v ? " on" : ""}" data-k="${k}" data-i="${i}">${img(svg({ ...st, [k]: v }))}</button>`).join("");
+  document.getElementById("top").innerHTML = opts("top", TOPS);
+  document.getElementById("facialHair").innerHTML = opts("facialHair", BEARDS);
+  document.getElementById("accessories").innerHTML = opts("accessories", GLASSES);
+  document.getElementById("mood").innerHTML = MOODS.map((_, i) => `<button class="opt${st.mood === i ? " on" : ""}" data-k="mood" data-i="${i}">${img(svg({ ...st, mood: i }))}</button>`).join("");
+}
+const LISTS = { top: TOPS, facialHair: BEARDS, accessories: GLASSES };
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-k]"); if (!b) return;
+  const k = b.dataset.k;
+  if (k === "mood") st.mood = +b.dataset.i;
+  else if (LISTS[k]) st[k] = LISTS[k][+b.dataset.i];
+  else st[k] = b.dataset.v;
+  draw();
+});
+draw();
+
+/* ---------- photo -> skin + hair colour (on this phone only) ---------- */
+const status = (m) => document.getElementById("status").textContent = m;
+let landmarker = null;
+async function getLandmarker() {
+  if (landmarker) return landmarker;
+  status("Loading the face finder (first time only)...");
+  const v = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm");
+  const files = await v.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  landmarker = await v.FaceLandmarker.createFromOptions(files, {
+    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task" },
+    runningMode: "IMAGE", numFaces: 1,
+  });
+  return landmarker;
+}
+// sRGB -> CIELAB, so "nearest colour" matches what the eye sees.
+function lab([r, g, b]) {
+  const f = (c) => { c /= 255; return c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92; };
+  const [R, G, B] = [f(r), f(g), f(b)];
+  let x = (R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047, y = R * 0.2126 + G * 0.7152 + B * 0.0722, z = (R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883;
+  const h = (t) => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+  [x, y, z] = [h(x), h(y), h(z)];
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+const hexRgb = (h) => [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+function nearest(rgb, palette) {
+  const a = lab(rgb);
+  let best = palette[0], bd = Infinity;
+  for (const p of palette) { const b = lab(hexRgb(p)); const d = (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2; if (d < bd) { bd = d; best = p; } }
+  return best;
+}
+// Median colour of a small square around (x, y), in pixels.
+function sample(ctx, x, y, r) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const x0 = Math.max(0, Math.round(x - r)), y0 = Math.max(0, Math.round(y - r));
+  const w = Math.min(W - x0, Math.round(2 * r)), h = Math.min(H - y0, Math.round(2 * r));
+  if (w < 1 || h < 1) return null;
+  const d = ctx.getImageData(x0, y0, w, h).data, px = [];
+  for (let i = 0; i < d.length; i += 4) px.push([d[i], d[i + 1], d[i + 2]]);
+  const med = (k) => px.map(p => p[k]).sort((a, b) => a - b)[px.length >> 1];
+  return [med(0), med(1), med(2)];
+}
+document.getElementById("pick").onclick = () => document.getElementById("file").click();
+document.getElementById("file").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const url = URL.createObjectURL(f);
+  const im = new Image(); im.src = url; await im.decode();
+  const ph = document.getElementById("photo"); ph.src = url; ph.style.display = "block";
+  try {
+    const lm = await getLandmarker();
+    status("Looking at your photo...");
+    const S = Math.min(1, 1024 / Math.max(im.width, im.height));
+    const c = document.createElement("canvas"); c.width = Math.round(im.width * S); c.height = Math.round(im.height * S);
+    const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.drawImage(im, 0, 0, c.width, c.height);
+    const res = lm.detect(c);
+    const pts = res.faceLandmarks?.[0];
+    if (!pts) return status("Couldn't find a face. Pick the colours yourself below.");
+    const P = (i) => [pts[i].x * c.width, pts[i].y * c.height];
+    const top = P(10), chin = P(152), faceH = Math.hypot(chin[0] - top[0], chin[1] - top[1]);
+    const r = faceH * 0.04;
+    // Skin: both cheeks and the forehead, take the middle one (shadows/shine on one side don't win).
+    const skins = [205, 425, 151].map(i => sample(ctx, ...P(i), r)).filter(Boolean);
+    const skinRgb = [0, 1, 2].map(k => skins.map(s => s[k]).sort((a, b) => a - b)[skins.length >> 1]);
+    // Hair: just above the top of the forehead, along the face's own up direction.
+    const ux = (top[0] - chin[0]) / faceH, uy = (top[1] - chin[1]) / faceH;
+    const hair = sample(ctx, top[0] + ux * faceH * 0.1, top[1] + uy * faceH * 0.1, r);
+    st.skin = nearest(skinRgb, SKIN);
+    if (hair) {
+      const dl = Math.abs(lab(hair)[0] - lab(skinRgb)[0]);
+      // Hair that looks like skin = bald / shaved, or a hijab colour: keep the current hair colour.
+      if (dl > 12) st.hairColor = nearest(hair, HAIRC);
+    }
+    draw();
+    status("Done. Skin and hair colour copied. Now pick your hair, beard and glasses.");
+  } catch (err) {
+    console.error(err);
+    status("The face finder didn't load. Pick the colours yourself below.");
+  }
+};
+</script>
+</body>
+</html>
