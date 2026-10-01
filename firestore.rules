@@ -4,6 +4,8 @@ rules_version = '2';
 // A name (person) is locked to one browser (anonymous uid). Only the trip maker can unlock it.
 // An expense belongs to the person who PAID it. The maker can only soft-delete/restore and unlock.
 // Everything closes 14 days after the trip's last activity. Nothing is ever hard-deleted from a client.
+// The maker can delete a trip (deletedAt). Any member can bring it back within 3 days; after that it is
+// closed for good and the weekly cleanup erases it. While deleted, the trip is read-only.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -11,7 +13,13 @@ service cloud.firestore {
     function tripPath(t) { return /databases/$(database)/documents/trips/$(t); }
     function personPath(t, p) { return /databases/$(database)/documents/trips/$(t)/people/$(p); }
     function memberPath(t, u) { return /databases/$(database)/documents/trips/$(t)/members/$(u); }
-    function alive(tripData) { return request.time < tripData.lastActivity + duration.value(14, 'd'); }
+    // Readable: not expired, and not deleted more than 3 days ago.
+    function alive(tripData) {
+      return request.time < tripData.lastActivity + duration.value(14, 'd')
+        && (tripData.get('deletedAt', null) == null || request.time < tripData.deletedAt + duration.value(3, 'd'));
+    }
+    // Writable: alive and not deleted.
+    function writable(tripData) { return alive(tripData) && tripData.get('deletedAt', null) == null; }
 
     function isMember(t) { return signedIn() && exists(memberPath(t, request.auth.uid)); }
     function myPerson(t) { return get(memberPath(t, request.auth.uid)).data.person; }
@@ -19,6 +27,12 @@ service cloud.firestore {
 
     function str(s, min, max) { return s is string && s.size() >= min && s.size() <= max; }
     function personId(p) { return p is string && p.matches('^p([1-9]|1[0-9]|20)$'); }
+    // Either an InstaPay payment link (https://ipn.eg/...) or a handle (name@instapay), or empty.
+    function validInstapay(s) {
+      return s is string && (s == ''
+        || s.matches('^https://ipn[.]eg/[A-Za-z0-9/_.-]{1,90}$')
+        || s.matches('^[A-Za-z0-9._-]{1,40}@instapay$'));
+    }
     function validAvatar(a) {
       return a is map && a.keys().hasOnly(['k', 'v']) && a.keys().hasAll(['k', 'v'])
         && a.k in ['dice', 'photo'] && str(a.v, 1, 60000)
@@ -41,13 +55,30 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.lastActivity == request.time;
 
-      // Members may only bump lastActivity. The maker may also rename and open/close joining.
-      allow update: if isMember(t) && alive(resource.data)
-        && request.resource.data.lastActivity == request.time
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-             resource.data.maker == request.auth.uid ? ['lastActivity', 'open', 'name'] : ['lastActivity'])
-        && str(request.resource.data.name, 1, 40)
-        && request.resource.data.open is bool;
+      allow update: if isMember(t) && (
+        // Members may only bump lastActivity. The maker may also rename and open/close joining.
+        (writable(resource.data)
+          && request.resource.data.lastActivity == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+               resource.data.maker == request.auth.uid ? ['lastActivity', 'open', 'name'] : ['lastActivity'])
+          && str(request.resource.data.name, 1, 40)
+          && request.resource.data.open is bool)
+        ||
+        // The maker deletes the trip (soft): stamps the time and who did it.
+        (writable(resource.data)
+          && resource.data.maker == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
+          && request.resource.data.deletedAt == request.time
+          && request.resource.data.deletedBy == myPerson(t))
+        ||
+        // Any member brings it back within the 3 days.
+        (alive(resource.data)
+          && resource.data.get('deletedAt', null) != null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy', 'lastActivity'])
+          && request.resource.data.deletedAt == null
+          && request.resource.data.deletedBy == null
+          && request.resource.data.lastActivity == request.time)
+      );
 
       allow delete: if false;
 
@@ -60,17 +91,17 @@ service cloud.firestore {
         allow create: if signedIn() && personId(p)
           && getAfter(tripPath(t)).data.maker == request.auth.uid
           && getAfter(tripPath(t)).data.open == true
-          && alive(getAfter(tripPath(t)).data)
+          && writable(getAfter(tripPath(t)).data)
           && request.resource.data.keys().hasOnly(['name', 'avatar', 'instapay', 'uid'])
           && request.resource.data.keys().hasAll(['name', 'avatar', 'instapay', 'uid'])
           && str(request.resource.data.name, 1, 24)
           && validAvatar(request.resource.data.avatar)
-          && str(request.resource.data.instapay, 0, 60)
+          && validInstapay(request.resource.data.instapay)
           && (request.resource.data.uid == null
               || (request.resource.data.uid == request.auth.uid
                   && getAfter(memberPath(t, request.auth.uid)).data.person == p));
 
-        allow update: if signedIn() && alive(get(tripPath(t)).data) && (
+        allow update: if signedIn() && writable(get(tripPath(t)).data) && (
           // Claim: an unclaimed name, joining open, and a matching member doc in the same batch.
           (resource.data.uid == null
             && request.resource.data.uid == request.auth.uid
@@ -82,7 +113,7 @@ service cloud.firestore {
           (resource.data.uid == request.auth.uid
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['avatar', 'instapay'])
             && validAvatar(request.resource.data.avatar)
-            && str(request.resource.data.instapay, 0, 60))
+            && validInstapay(request.resource.data.instapay))
           ||
           // The maker renames, changes the avatar, or unlocks (uid -> null, member doc removed in the same batch).
           (isMaker(t)
@@ -109,20 +140,21 @@ service cloud.firestore {
           && personId(request.resource.data.person)
           && getAfter(personPath(t, request.resource.data.person)).data.uid == u
           && getAfter(tripPath(t)).data.open == true
-          && alive(getAfter(tripPath(t)).data);
+          && writable(getAfter(tripPath(t)).data);
 
         allow update: if false;
 
         // Unlock by the maker (the person is released in the same batch).
         // The maker can never drop their own membership, so they can't take over someone else's name.
         allow delete: if isMaker(t) && u != request.auth.uid
+          && writable(get(tripPath(t)).data)
           && getAfter(personPath(t, resource.data.person)).data.uid == null;
       }
 
       match /expenses/{e} {
         allow read: if isMember(t) && alive(get(tripPath(t)).data);
 
-        allow create: if isMember(t) && alive(get(tripPath(t)).data)
+        allow create: if isMember(t) && writable(get(tripPath(t)).data)
           && request.resource.data.keys().hasOnly(['type', 'amount', 'desc', 'cat', 'paidBy', 'split', 'by', 'ts', 'deleted'])
           && request.resource.data.keys().hasAll(['type', 'amount', 'desc', 'cat', 'paidBy', 'split', 'by', 'ts', 'deleted'])
           && validExpense(request.resource.data)
@@ -130,7 +162,7 @@ service cloud.firestore {
           && request.resource.data.ts == request.time
           && request.resource.data.deleted == false;
 
-        allow update: if isMember(t) && alive(get(tripPath(t)).data)
+        allow update: if isMember(t) && writable(get(tripPath(t)).data)
           && request.resource.data.keys().hasOnly(['type', 'amount', 'desc', 'cat', 'paidBy', 'split', 'by', 'ts', 'deleted', 'editedBy', 'editedAt'])
           && validExpense(request.resource.data)
           && request.resource.data.editedBy == myPerson(t)

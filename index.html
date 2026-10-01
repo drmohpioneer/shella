@@ -47,6 +47,10 @@ input,select{font:inherit}
   padding:4px 12px 4px 4px;border-radius:99px;font-weight:600;font-size:14px;flex-shrink:0}
 [dir=rtl] .me{padding:4px 4px 4px 12px}
 .me img{width:34px;height:34px;border-radius:50%;background:var(--c)}
+.homebtn{width:42px;height:42px;border-radius:50%;background:var(--card2);border:1px solid var(--line);font-size:19px;flex-shrink:0;display:grid;place-items:center}
+.brandrow{display:flex;align-items:center;gap:10px;min-width:0}
+.ipay.pay{font-size:13px;font-weight:700;padding:7px 12px;white-space:nowrap;text-decoration:none;color:#032a25;background:var(--teal)}
+.banner .later{background:var(--card2);color:var(--text)}
 .total-wrap{position:relative;text-align:center;margin-top:26px}
 .total-label{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:2.5px}
 .total{font-family:"Baloo 2",sans-serif;font-weight:800;font-size:64px;line-height:1;margin-top:6px;direction:ltr;
@@ -226,7 +230,7 @@ select.field option{color:#000}
   <div class="sun"></div>
   <div class="wrap">
     <div class="topbar">
-      <div class="brand" id="brand"></div>
+      <div class="brandrow"><button class="homebtn" id="homeBtn">🏠</button><div class="brand" id="brand"></div></div>
       <button class="me" id="meBtn"></button>
     </div>
     <div class="total-wrap">
@@ -242,6 +246,7 @@ select.field option{color:#000}
 </header>
 
 <main class="wrap hide" id="main">
+  <div id="tip"></div>
   <div id="expiry"></div>
   <section>
     <h2 data-t="whoOwes"></h2>
@@ -300,6 +305,7 @@ select.field option{color:#000}
     <p data-t="appTag"></p>
     <button class="save" id="createBtn" data-t="create"></button>
     <p class="note" data-t="gotLink"></p>
+    <div class="prow"><input class="field" id="pasteIn" autocomplete="off" inputmode="url"><button class="mbtn" id="pasteGo" data-t="openBtn"></button></div>
     <div class="trips" id="myTrips"></div>
   </div>
 </div>
@@ -369,6 +375,7 @@ select.field option{color:#000}
     <div style="font-size:64px" id="msgIcon"><span class="spin"></span></div>
     <h1 id="msgTitle"></h1>
     <p id="msgBody"></p>
+    <button class="save hide" id="msgAct"></button>
     <button class="ghost hide" id="msgHome" data-t="goHome"></button>
   </div>
 </div>
@@ -398,7 +405,7 @@ const CATS = [["food","🍽️"],["cafe","☕"],["transport","🚕"],["stay","�
 const T = {
 en: {
   appTag:"Split group expenses with your crew. No signup, no drama.", create:"Create a trip", yourTrips:"Your trips",
-  gotLink:"Got a link from a friend? Just open it.", tripNamePh:"Trip name (Dahab weekend, Friday dinner...)",
+  gotLink:"Got a link from a friend? Just open it, or paste it here.", pasteLink:"Paste a trip link", openBtn:"Open", badLink:"That's not a Shella trip link", tripNamePh:"Trip name (Dahab weekend, Friday dinner...)",
   names:"Who's coming?", namePh:"Name", thisIsMe:"Me", tapFace:"Tap a face to change it, 📷 for a photo. Tap \"Me\" on your own row.",
   deleteNote:"Your trip and photos are deleted 14 days after the last expense.", createBtn:"Create trip", creating:"Creating...", back:"Back",
   needNames:"Fill in every name", dupNames:"Two people have the same name", needTripName:"Give the trip a name",
@@ -425,7 +432,13 @@ en: {
   added:"{amt} added", updated:"Updated ✏️", deleted:"Moved to the undo bin 🗑️", restored:"Restored ↩️", saveFail:"Couldn't save. Check your connection.",
   limitExp:"This trip reached {n} expenses.", today:"Today", yesterday:"Yesterday", justNow:"Just now",
   closesIn:"This trip closes in {n} days. Copy the final summary to keep it.", closesToday:"This trip closes today. Copy the final summary to keep it.",
-  copySummary:"Copy summary", myProfile:"My profile", instapay:"InstaPay handle (optional)", instapayPh:"name@instapay",
+  copySummary:"Copy summary", myProfile:"My profile", instapay:"InstaPay link (optional). Paste the link InstaPay gives you to share.", instapayPh:"https://ipn.eg/S/...",
+  badIpay:"Paste your InstaPay link (it starts with https://ipn.eg/)", payIpay:"Pay with InstaPay",
+  androidTip:"Add Shella to your home screen: Chrome menu ⋮ then \"Add to Home screen\".", gotIt:"Got it",
+  deleteTrip:"Delete this trip", deleteTypeName:"This deletes the trip for everyone. Anyone in the trip can bring it back within 3 days.\n\nType the trip name to confirm:",
+  deleteWrong:"The name didn't match. Nothing was deleted.", tripDeleted:"Trip deleted 🗑️",
+  deletedTitle:"This trip was deleted", deletedBody:"{name} deleted it. Anyone in the trip can bring it back until {date}. After that it's gone for good.",
+  bringBack:"Bring it back", broughtBack:"The trip is back ↩️",
   langSwitch:"العربية", undoBin:"Undo bin", undoEmpty:"Nothing deleted.", restore:"Restore", tripSettings:"Trip settings",
   shareLink:"Share trip link", closeJoin:"Close joining", openJoin:"Open joining", joiningOpen:"Joining is open", joiningClosed:"Joining is closed",
   unlock:"Unlock", unlockConfirm:"Unlock {name}? They'll pick their name again on their phone.", unlocked:"{name} unlocked",
@@ -438,7 +451,7 @@ en: {
 },
 ar: {
   appTag:"حسابات الشلة في مكان واحد. من غير تسجيل ولا خناق.", create:"اعمل رحلة", yourTrips:"رحلاتك",
-  gotLink:"صاحبك بعتلك لينك؟ افتحه بس.", tripNamePh:"اسم الرحلة (ويكند دهب، عشا الخميس...)",
+  gotLink:"صاحبك بعتلك لينك؟ افتحه بس، أو الصقه هنا.", pasteLink:"الصق لينك الرحلة", openBtn:"افتح", badLink:"ده مش لينك رحلة على Shella", tripNamePh:"اسم الرحلة (ويكند دهب، عشا الخميس...)",
   names:"مين جاي؟", namePh:"الاسم", thisIsMe:"أنا", tapFace:"دوس على الوش يتغير، و📷 لو عايز صورة. ودوس \"أنا\" جنب اسمك.",
   deleteNote:"الرحلة والصور بيتمسحوا بعد ١٤ يوم من آخر مصروف.", createBtn:"اعمل الرحلة", creating:"بنعملها...", back:"رجوع",
   needNames:"اكتب اسم كل واحد", dupNames:"فيه اتنين بنفس الاسم", needTripName:"سمّي الرحلة",
@@ -465,7 +478,13 @@ ar: {
   added:"اتضاف {amt}", updated:"اتعدل ✏️", deleted:"راح المحذوفات 🗑️", restored:"رجع ↩️", saveFail:"مقدرناش نحفظ. شوف النت.",
   limitExp:"الرحلة دي وصلت {n} مصروف.", today:"النهارده", yesterday:"امبارح", justNow:"دلوقتي",
   closesIn:"الرحلة هتتقفل بعد {n} يوم. انسخ الحساب النهائي عشان يفضل معاك.", closesToday:"الرحلة هتتقفل النهارده. انسخ الحساب النهائي عشان يفضل معاك.",
-  copySummary:"انسخ الحساب", myProfile:"بياناتي", instapay:"حساب InstaPay (اختياري)", instapayPh:"name@instapay",
+  copySummary:"انسخ الحساب", myProfile:"بياناتي", instapay:"لينك InstaPay (اختياري). الصق اللينك اللي InstaPay بيديهولك عشان تشاركه.", instapayPh:"https://ipn.eg/S/...",
+  badIpay:"الصق لينك InstaPay بتاعك (بيبدأ بـ https://ipn.eg/)", payIpay:"ادفع بـ InstaPay",
+  androidTip:"حط Shella على الشاشة الرئيسية: من قايمة Chrome ⋮ اختار \"Add to Home screen\".", gotIt:"تمام",
+  deleteTrip:"امسح الرحلة دي", deleteTypeName:"ده هيمسح الرحلة عند الكل. أي حد في الرحلة يقدر يرجعها خلال ٣ أيام.\n\nاكتب اسم الرحلة للتأكيد:",
+  deleteWrong:"الاسم مش مطابق. متمسحش حاجة.", tripDeleted:"الرحلة اتمسحت 🗑️",
+  deletedTitle:"الرحلة دي اتمسحت", deletedBody:"{name} مسحها. أي حد في الرحلة يقدر يرجعها لحد {date}. بعد كده هتتمسح خالص.",
+  bringBack:"رجّع الرحلة", broughtBack:"الرحلة رجعت ↩️",
   langSwitch:"English", undoBin:"المحذوفات", undoEmpty:"مفيش حاجة اتمسحت.", restore:"رجّع", tripSettings:"إعدادات الرحلة",
   shareLink:"ابعت لينك الرحلة", closeJoin:"اقفل الدخول", openJoin:"افتح الدخول", joiningOpen:"الدخول مفتوح", joiningClosed:"الدخول مقفول",
   unlock:"فك القفل", unlockConfirm:"تفك قفل {name}؟ هيختار اسمه تاني من موبايله.", unlocked:"اتفك قفل {name}",
@@ -493,7 +512,7 @@ function applyLang() {
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
   document.querySelectorAll("[data-t]").forEach(el => el.textContent = t(el.dataset.t));
   document.querySelectorAll("[data-lang]").forEach(el => el.textContent = t("langSwitch"));
-  $("fDesc").placeholder = t("descPh"); $("cName").placeholder = t("tripNamePh");
+  $("fDesc").placeholder = t("descPh"); $("cName").placeholder = t("tripNamePh"); $("pasteIn").placeholder = t("pasteLink");
 }
 function setLang(l) { lang = l; store.set("lang", l); applyLang(); rerender(); }
 document.addEventListener("click", (e) => { if (e.target.closest("[data-lang]")) setLang(lang === "ar" ? "en" : "ar"); });
@@ -515,6 +534,20 @@ const ua = navigator.userAgent;
 const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 const inApp = /WhatsApp|FBAN|FBAV|Instagram/i.test(ua);
+const isAndroid = /Android/i.test(ua);
+
+// InstaPay: a payment link (https://ipn.eg/...) or a handle (name@instapay). Same shapes as firestore.rules.
+const IPAY_LINK_RE = /^https:\/\/ipn\.eg\/[A-Za-z0-9\/_.-]{1,90}$/;
+const IPAY_HANDLE_RE = /^[A-Za-z0-9._-]{1,40}@instapay$/;
+// Pulls the link (or handle) out of whatever was pasted, e.g. InstaPay's whole share message. null = not valid.
+function cleanIpay(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  const link = (s.match(/https:\/\/ipn\.eg\/[A-Za-z0-9\/_.-]+/i) || [""])[0].replace(/^https:\/\/ipn\.eg/i, "https://ipn.eg").replace(/\.+$/, "");
+  if (IPAY_LINK_RE.test(link)) return link;
+  const h = (s.match(/[A-Za-z0-9._-]{1,40}@instapay\b/i) || [""])[0].replace(/@instapay$/i, "@instapay");
+  return IPAY_HANDLE_RE.test(h) ? h : null;
+}
 
 let deferredInstall = null;
 addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredInstall = e; });
@@ -528,6 +561,7 @@ function msg(icon, title, body, home = true) {
   hideApp();
   $("msgIcon").innerHTML = icon; $("msgTitle").textContent = title; $("msgBody").textContent = body;
   $("msgHome").classList.toggle("hide", !home);
+  $("msgAct").classList.add("hide");
   show("msgScreen");
 }
 $("msgHome").addEventListener("click", () => { location.href = location.pathname; });
@@ -624,8 +658,29 @@ function stopAll() { stopped = true; if (unsubExp) { unsubExp(); unsubExp = null
 
 function route() {
   if (stopped || !trip || !order.length) return;
+  if (trip.deletedAt) return showDeleted();
   if (me && people[me]) { showApp(); render(); return; }
   hideApp(); showWho();
+}
+
+/* ---------- deleted trip (3 days to bring it back) ---------- */
+const UNDO_DAYS = 3;
+function showDeleted() {
+  closeLayers();
+  const until = new Date(tsMs(trip.deletedAt) + UNDO_DAYS * 86400000);
+  const date = until.toLocaleString(lang === "ar" ? "ar-EG" : "en-GB", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  msg("🗑️", t("deletedTitle"), t("deletedBody", { name: nameOf(trip.deletedBy), date }));
+  const b = $("msgAct");
+  b.textContent = t("bringBack");
+  b.classList.toggle("hide", !me);
+  b.onclick = async () => {
+    b.disabled = true;
+    const batch = writeBatch(db);
+    batch.update(tripRef(), { deletedAt: null, deletedBy: null, lastActivity: serverTimestamp() });
+    try { await timeout(batch.commit(), 15000); toast(t("broughtBack")); }
+    catch { toast(navigator.onLine ? t("saveFail") : t("needNet")); }
+    finally { b.disabled = false; }
+  };
 }
 
 /* ---------- who are you ---------- */
@@ -693,7 +748,7 @@ function summaryText() {
   const plan = settlements(net);
   if (!plan.length) lines.push(t("allSquare"));
   plan.forEach(s => {
-    const h = people[s.to]?.instapay;
+    const h = cleanIpay(people[s.to]?.instapay);
     lines.push(`${t("pays", { a: nameOf(s.from), b: nameOf(s.to) })}: ${fmt(s.amount)} ${cur}${h ? ` (InstaPay ${h})` : ""}`);
   });
   lines.push("", t("madeWith"));
@@ -719,6 +774,9 @@ function render() {
   $("sub").innerHTML = `<span class="sync${navigator.onLine ? "" : " off"}"></span>${t("peopleN", { n: order.length })} · ${t("expensesN", { n: expenses.length })}`;
   $("crew").innerHTML = order.map(pid => face(pid)).join("");
 
+  $("tip").innerHTML = isAndroid && !standalone && store.get("androidTip") !== "1"
+    ? `<div class="banner"><span class="grow">${t("androidTip")}</span>${deferredInstall ? `<button data-tip="install">${t("install")}</button>` : ""}<button class="later" data-tip="ok">${t("gotIt")}</button></div>` : "";
+
   const left = daysLeft();
   $("expiry").innerHTML = left <= WARN_DAYS
     ? `<div class="banner"><span class="grow">${left < 1 ? t("closesToday") : t("closesIn", { n: Math.ceil(left) })}</span><button id="sumBtn">${t("copySummary")}</button></div>` : "";
@@ -738,10 +796,12 @@ function render() {
   const plan = settlements(net);
   $("settleCount").textContent = plan.length || "";
   $("settle").innerHTML = plan.length ? plan.map((s, i) => {
-    const h = people[s.to]?.instapay;
+    const h = people[s.to]?.instapay || "";
+    const ip = IPAY_LINK_RE.test(h) ? `<a class="ipay pay" href="${esc(h)}" target="_blank" rel="noopener noreferrer">💳 ${t("payIpay")}</a>`
+      : IPAY_HANDLE_RE.test(h) ? `<button class="ipay" data-copy="${esc(h)}">${esc(t("ipay", { h }))} ⧉</button>` : "";
     return `<div class="settle-row">
       <div class="pair">${face(s.from)}<span class="arrow">➜</span>${face(s.to)}</div>
-      <div class="txt">${esc(t("pays", { a: nameOf(s.from), b: nameOf(s.to) }))}<b>${fmt(s.amount)} ${cur}</b>${h ? `<button class="ipay" data-copy="${esc(h)}">${esc(t("ipay", { h }))} ⧉</button>` : ""}</div>
+      <div class="txt">${esc(t("pays", { a: nameOf(s.from), b: nameOf(s.to) }))}<b>${fmt(s.amount)} ${cur}</b>${ip}</div>
       <button class="btn-paid" data-i="${i}">${t("paidBtn")}</button>
     </div>`;
   }).join("")
@@ -787,6 +847,12 @@ $("list").addEventListener("click", (e) => {
   openSheet(items.find(x => x.id === b.dataset.id));
 });
 $("expiry").addEventListener("click", (e) => { if (e.target.id === "sumBtn") copy(summaryText()); });
+$("tip").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-tip]"); if (!b) return;
+  if (b.dataset.tip === "install" && deferredInstall) { deferredInstall.prompt(); deferredInstall = null; }
+  store.set("androidTip", "1"); $("tip").innerHTML = "";
+});
+$("homeBtn").addEventListener("click", () => { location.href = location.pathname; });
 
 function dayLabel(ms) {
   if (!ms) return t("justNow");
@@ -920,7 +986,7 @@ function drawMenu(open) {
   $("menuTitle").textContent = t("myProfile");
   let h = `<div class="prow"><div class="pav" style="--c:${colorOf(me)}"><img src="${esc(avatarSrc(av))}" alt=""></div>
       <button class="mbtn" data-act="shuffle">🎲 ${t("shuffle")}</button><button class="mbtn" data-act="photo">📷 ${t("photo")}</button></div>
-    <input class="field" id="ipIn" maxlength="60" autocomplete="off" placeholder="${esc(t("instapayPh"))}" value="${esc(p.instapay || "")}">
+    <input class="field" id="ipIn" maxlength="400" autocomplete="off" inputmode="url" dir="ltr" placeholder="${esc(t("instapayPh"))}" value="${esc(p.instapay || "")}">
     <div class="note" style="text-align:start">${t("instapay")}</div>
     <button class="save" data-act="saveProfile">${t("save")}</button>
     <button class="ghost" data-act="summary">${t("copySummary")}</button>
@@ -948,17 +1014,25 @@ function drawMenu(open) {
       h += `<div class="prow"><input class="field" id="newPerson" maxlength="24" autocomplete="off" placeholder="${esc(t("addPersonPh"))}">
         <button class="mbtn" data-act="addPerson">+ ${t("addPerson")}</button></div>`;
     }
+    h += `<button class="del" data-act="deleteTrip">🗑️ ${t("deleteTrip")}</button>`;
   }
   $("menuBody").innerHTML = h;
   if (open) openLayer("menu");
 }
+$("menuBody").addEventListener("input", (e) => {
+  if (e.target.id !== "ipIn") return;
+  const ip = cleanIpay(e.target.value);
+  if (ip && IPAY_LINK_RE.test(ip) && ip !== e.target.value) e.target.value = ip;
+});
 $("menuBody").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act;
   if (act === "shuffle") { pendingAvatar = newDice(); drawMenu(); }
   else if (act === "photo") { pickPhoto(a => { pendingAvatar = a; drawMenu(); }); }
   else if (act === "saveProfile") {
-    const upd = { instapay: $("ipIn").value.trim().slice(0, 60) };
+    const ip = cleanIpay($("ipIn").value);
+    if (ip === null) return toast(t("badIpay"));
+    const upd = { instapay: ip };
     if (pendingAvatar) upd.avatar = pendingAvatar;
     const batch = writeBatch(db); batch.update(doc(peopleCol(), me), upd);
     batch.commit().catch(() => toast(t("saveFail")));
@@ -980,6 +1054,15 @@ $("menuBody").addEventListener("click", async (e) => {
     batch.update(doc(peopleCol(), pid), { uid: null });
     batch.delete(doc(db, "trips", TRIP, "members", q.uid));
     try { await timeout(batch.commit(), 15000); toast(t("unlocked", { name: q.name })); }
+    catch { toast(navigator.onLine ? t("saveFail") : t("needNet")); }
+  }
+  else if (act === "deleteTrip") {
+    const typed = prompt(t("deleteTypeName"), "");
+    if (typed === null) return;
+    if (typed.trim().toLowerCase() !== String(trip.name).trim().toLowerCase()) return toast(t("deleteWrong"));
+    const batch = writeBatch(db);
+    batch.update(tripRef(), { deletedAt: serverTimestamp(), deletedBy: me });
+    try { await timeout(batch.commit(), 15000); closeLayers(); toast(t("tripDeleted")); }
     catch { toast(navigator.onLine ? t("saveFail") : t("needNet")); }
   }
   else if (act === "addPerson") {
@@ -1026,6 +1109,14 @@ function showHome() {
     list.map(x => `<a href="#t=${encodeURIComponent(x.id)}" data-trip="${esc(x.id)}">${esc(x.name)}<span>›</span></a>`).join("") : "";
   show("homeScreen");
 }
+function openPasted() {
+  const v = $("pasteIn").value.trim();
+  const m = v.match(/[#?&]t=([A-Za-z0-9_-]{20,40})(?![A-Za-z0-9_-])/) || v.match(/^([A-Za-z0-9_-]{20,40})$/);
+  if (!m) return toast(t("badLink"));
+  location.href = tripLink(m[1]); location.reload();
+}
+$("pasteGo").addEventListener("click", openPasted);
+$("pasteIn").addEventListener("keydown", (e) => { if (e.key === "Enter") openPasted(); });
 $("myTrips").addEventListener("click", (e) => {
   const a = e.target.closest("[data-trip]"); if (!a) return;
   e.preventDefault(); location.href = tripLink(a.dataset.trip); location.reload();
@@ -1103,7 +1194,13 @@ function showInstall() {
   $("installWA").classList.toggle("hide", !inApp);
   show("installScreen");
 }
-$("installSkip").addEventListener("click", () => { store.set("skipInstall", "1"); boot(); });
+// "Continue in the browser" is remembered per trip, so a new trip link shows the steps again.
+// The home page skips the steps once the person has chosen the browser for any trip.
+function skippedInstall() {
+  if (TRIP) return store.get("skipInstall:" + TRIP) === "1";
+  try { return Object.keys(localStorage).some(k => k.startsWith("skipInstall")); } catch { return false; }
+}
+$("installSkip").addEventListener("click", () => { store.set("skipInstall:" + (TRIP || "home"), "1"); boot(); });
 
 /* ---------- fx ---------- */
 function boom() {
@@ -1124,7 +1221,7 @@ async function boot() {
   applyLang();
   if (!FIREBASE_CONFIG) return msg("🛠️", t("setupTitle"), t("setupBody"), false);
   // On iPhone the home-screen app has its own storage, so the name must be claimed inside it.
-  if (isIOS && !standalone && store.get("skipInstall") !== "1") return showInstall();
+  if (isIOS && !standalone && !skippedInstall()) return showInstall();
   if (!booted) { initFirebase(); booted = true; }
   msg('<span class="spin"></span>', t("loading"), "", false);
   try { await ensureAuth(); } catch { return msg("📡", t("dbErr"), t("needNet"), false); }
