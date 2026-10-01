@@ -27,11 +27,6 @@ service cloud.firestore {
     function isMember(t) { return signedIn() && exists(memberPath(t, request.auth.uid)); }
     function myPerson(t) { return get(memberPath(t, request.auth.uid)).data.person; }
     function isMaker(t) { return signedIn() && get(tripPath(t)).data.maker == request.auth.uid; }
-    // At most 3 unlocks per trip: each unlock bumps trip.unlocks by exactly 1 in the same batch.
-    function unlockCounted(t) {
-      return getAfter(tripPath(t)).data.get('unlocks', 0) == get(tripPath(t)).data.get('unlocks', 0) + 1
-        && getAfter(tripPath(t)).data.get('unlocks', 0) <= 3;
-    }
 
     function str(s, min, max) { return s is string && s.size() >= min && s.size() <= max; }
     function personId(p) { return p is string && p.matches('^p([1-9]|1[0-9]|20)$'); }
@@ -72,13 +67,6 @@ service cloud.firestore {
                resource.data.maker == request.auth.uid ? ['lastActivity', 'open', 'name'] : ['lastActivity'])
           && str(request.resource.data.name, 1, 40)
           && request.resource.data.open is bool)
-        ||
-        // The maker counts an unlock (the unlock itself is checked on the person and member docs).
-        (writable(resource.data)
-          && resource.data.maker == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unlocks'])
-          && request.resource.data.unlocks == resource.data.get('unlocks', 0) + 1
-          && request.resource.data.unlocks <= 3)
         ||
         // The maker deletes the trip (soft): stamps the time and who did it.
         (writable(resource.data)
@@ -195,15 +183,16 @@ service cloud.firestore {
             && str(request.resource.data.name, 1, 24)
             && validAvatar(request.resource.data.avatar))
           ||
-          // ...or unlocks someone (uid -> null, member doc removed, unlock counted, all in the same batch).
+          // ...or unlocks someone (uid -> null, member doc removed in the same batch), at most 2 times per person.
           // A joined person's name and face are theirs: the maker can't turn their slot into someone else.
           (isMaker(t)
             && resource.data.uid != null
             && resource.data.uid != request.auth.uid
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid', 'unlocks'])
             && request.resource.data.uid == null
-            && !existsAfter(memberPath(t, resource.data.uid))
-            && unlockCounted(t))
+            && request.resource.data.unlocks == resource.data.get('unlocks', 0) + 1
+            && request.resource.data.unlocks <= 2
+            && !existsAfter(memberPath(t, resource.data.uid)))
         );
 
         allow delete: if false;
@@ -228,7 +217,6 @@ service cloud.firestore {
         // The maker can never drop their own membership, so they can't take over someone else's name.
         allow delete: if isMaker(t) && u != request.auth.uid
           && writable(get(tripPath(t)).data)
-          && unlockCounted(t)
           && getAfter(personPath(t, resource.data.person)).data.uid == null;
       }
 

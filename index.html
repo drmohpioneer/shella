@@ -431,7 +431,7 @@ import * as avataaars from "https://cdn.jsdelivr.net/npm/@dicebear/avataaars@9.4
 // Public web config (Firebase web keys are public by design; the security lives in firestore.rules).
 const FIREBASE_CONFIG = /*FIREBASE_CONFIG*/{"apiKey": "AIzaSyAE1uXoIOJYMlfk5O7ApK8TRVZncGf2mMg", "authDomain": "shella-app-c406f.firebaseapp.com", "projectId": "shella-app-c406f", "storageBucket": "shella-app-c406f.firebasestorage.app", "messagingSenderId": "671376658589", "appId": "1:671376658589:web:74a1d6113724aa32a9c474"};
 const APP_CHECK_KEY = "";   // reCAPTCHA v3 site key; empty = App Check off
-const LIFETIME_DAYS = 14, MAX_TRIP_DAYS = 30, MAX_UNLOCKS = 3, WARN_DAYS = 2, MAX_PEOPLE = 20, MAX_EXPENSES = 500;
+const LIFETIME_DAYS = 14, MAX_TRIP_DAYS = 30, MAX_UNLOCKS = 2, WARN_DAYS = 2, MAX_PEOPLE = 20, MAX_EXPENSES = 500;
 const CURRENCIES = ["EGP", "USD", "EUR", "SAR", "AED", "KWD", "QAR", "GBP", "TRY", "JOD"];
 const COLORS = ["#ffc861","#6ea8ff","#45e38f","#ff7a59","#c084fc","#2ee6c9","#ff5d73","#f9a8d4","#a3e635","#fbbf24",
                 "#60a5fa","#34d399","#fb923c","#e879f9","#22d3ee","#f87171","#facc15","#818cf8","#4ade80","#fda4af"];
@@ -461,7 +461,7 @@ en: {
   claimConfirm:"You're {name}? Your name will be locked to this phone.", claimFail:"Couldn't lock that name. Someone may have just taken it.",
   closedJoin:"Joining is closed. Ask the trip maker to open it.", goHome:"Go to Shella home",
   notFoundTitle:"Trip not found", notFoundBody:"This trip doesn't exist or has ended. Trips close 14 days after the last expense, or 30 days after they start.",
-  yourName:"Your name", unlockLeft:"Unlock ({n} left)", noUnlocks:"No unlocks left in this trip ({n} used).",
+  yourName:"Your name", unlockLeft:"Unlock ({n} left)", noUnlocks:"no unlocks left",
   setupTitle:"Almost ready", setupBody:"Shella is being set up. Try again in a bit.", needNet:"You need internet for this step.",
   loading:"Loading...", tripTotal:"Trip total", whoOwes:"Who owes who", settleUp:"Settle up", expenses:"Expenses", addExpense:"Add expense",
   peopleN:"{n} people", expensesN:"{n} expenses", getsBack:"gets back", owes:"owes", square:"all square ✌️", paidX:"paid {x}",
@@ -521,7 +521,7 @@ ar: {
   claimConfirm:"إنت {name}؟ اسمك هيتقفل على الموبايل ده.", claimFail:"مقدرناش نقفل الاسم ده. ممكن حد لسه واخده.",
   closedJoin:"الدخول مقفول. كلم صاحب الرحلة يفتحه.", goHome:"روح لصفحة Shella",
   notFoundTitle:"الرحلة مش موجودة", notFoundBody:"الرحلة دي مش موجودة أو خلصت. الرحلات بتتقفل بعد ١٤ يوم من آخر مصروف، أو بعد ٣٠ يوم من بدايتها.",
-  yourName:"اسمك", unlockLeft:"فك القفل (فاضل {n})", noUnlocks:"مفيش فك قفل تاني في الرحلة دي (اتستخدم {n}).",
+  yourName:"اسمك", unlockLeft:"فك القفل (فاضل {n})", noUnlocks:"مفيش فك قفل تاني",
   setupTitle:"قربنا", setupBody:"Shella لسه بتتجهز. جرب كمان شوية.", needNet:"محتاج نت للخطوة دي.",
   loading:"ثانية واحدة...", tripTotal:"إجمالي الرحلة", whoOwes:"مين عليه كام", settleUp:"التسوية", expenses:"المصاريف", addExpense:"ضيف مصروف",
   peopleN:"{n} أفراد", expensesN:"{n} مصروف", getsBack:"ليه", owes:"عليه", square:"خالص ✌️", paidX:"دفع {x}",
@@ -1165,14 +1165,13 @@ function drawMenu(open) {
       <button class="save" data-act="share">${t("shareLink")}</button>
       <div class="mrow"><div class="grow">${trip.open ? t("joiningOpen") : t("joiningClosed")}</div>
         <button class="mbtn" data-act="toggleOpen">${trip.open ? t("closeJoin") : t("openJoin")}</button></div>`;
-    const unlocksLeft = MAX_UNLOCKS - (trip.unlocks || 0);
     h += order.map(pid => {
-      const q = people[pid];
-      const tag = (pid === me ? t("you") : q.uid ? t("joined") : t("waiting")) + (trip.backup === pid ? " · " + t("backupTag") : "");
+      const q = people[pid], unlocksLeft = MAX_UNLOCKS - (q.unlocks || 0);
+      const tag = (pid === me ? t("you") : q.uid ? t("joined") : t("waiting")) + (trip.backup === pid ? " · " + t("backupTag") : "")
+        + (q.uid && pid !== me && unlocksLeft <= 0 ? " · " + t("noUnlocks") : "");
       return `<div class="mrow">${face(pid)}<div class="grow">${esc(q.name)}<small>${tag}</small></div>
         ${q.uid && pid !== me && unlocksLeft > 0 ? `<button class="mbtn warn2" data-act="unlock" data-id="${pid}">${t("unlockLeft", { n: unlocksLeft })}</button>` : ""}</div>`;
     }).join("");
-    if (unlocksLeft <= 0) h += `<div class="note" style="text-align:start">${t("noUnlocks", { n: MAX_UNLOCKS })}</div>`;
     if (order.length < MAX_PEOPLE && trip.open) {
       h += `<div class="prow"><input class="field" id="newPerson" maxlength="24" autocomplete="off" placeholder="${esc(t("addPersonPh"))}">
         <button class="mbtn" data-act="addPerson">+ ${t("addPerson")}</button></div>`;
@@ -1229,9 +1228,8 @@ $("menuBody").addEventListener("click", async (e) => {
     const pid = b.dataset.id, q = people[pid];
     if (!confirm(t("unlockConfirm", { name: q.name }))) return;
     const batch = writeBatch(db);
-    batch.update(doc(peopleCol(), pid), { uid: null });
+    batch.update(doc(peopleCol(), pid), { uid: null, unlocks: (q.unlocks || 0) + 1 });
     batch.delete(doc(db, "trips", TRIP, "members", q.uid));
-    batch.update(tripRef(), { unlocks: (trip.unlocks || 0) + 1 });
     try { await timeout(batch.commit(), 15000); toast(t("unlocked", { name: q.name })); }
     catch { toast(navigator.onLine ? t("saveFail") : t("needNet")); }
   }
