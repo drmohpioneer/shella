@@ -818,13 +818,17 @@ function showDeleted() {
 }
 
 /* ---------- who are you ---------- */
+let whoHtml = "";
 function showWho() {
   const open = trip.open;
   $("whoBody").textContent = open ? t("whoBody") : t("closedJoin");
-  $("whoFaces").innerHTML = order.map(pid => {
+  const html = order.map(pid => {
     const taken = !!people[pid].uid;
     return `<button class="face on${taken ? " taken" : ""}" data-id="${pid}" ${taken || !open ? "disabled" : ""}>${face(pid)}<span class="nm">${esc(people[pid].name)}</span>${taken ? `<span class="lock">${t("taken")}</span>` : ""}</button>`;
   }).join("");
+  // Redraw only when something changed: every snapshot calls this, and replacing the buttons
+  // mid-tap made the tap land on a button that no longer exists.
+  if (html !== whoHtml) { $("whoFaces").innerHTML = html; whoHtml = html; }
   show("whoScreen");
 }
 $("whoFaces").addEventListener("click", async (e) => {
