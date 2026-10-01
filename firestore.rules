@@ -43,7 +43,7 @@ service cloud.firestore {
     }
     function validAvatar(a) {
       return a is map && a.keys().hasOnly(['k', 'v']) && a.keys().hasAll(['k', 'v'])
-        && a.k in ['dice', 'photo', 'face'] && str(a.v, 1, 60000)
+        && a.k in ['dice', 'photo', 'face'] && str(a.v, 1, 30000)
         && (a.k == 'dice' ? a.v.matches('^[A-Za-z0-9_-]{1,32}$')
           : a.k == 'face' ? a.v.matches('^s[0-9]h[0-9]t[0-9]{1,2}b[0-9]g[0-9]m[0-9]$')
                           : a.v.matches('^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$'));

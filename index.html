@@ -213,6 +213,7 @@ select.field option{color:#000}
 .mrow .grow small{display:block;color:var(--muted);font-size:12px}
 .mbtn{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700;white-space:nowrap}
 .mbtn.warn2{color:var(--red)}
+.bintoggle{font-size:14px;padding:11px;color:var(--muted);margin-top:22px}
 .mhead{font-family:var(--head);font-size:18px;margin:18px 0 6px}
 .hist{margin-top:12px;text-align:center;font-size:12px;color:var(--muted)}
 
@@ -448,7 +449,7 @@ en: {
   fmFail:"The face finder didn't load. Pick the colours yourself.", skin:"Skin", hairColour:"Hair colour", hair:"Hair", beard:"Beard",
   glasses:"Glasses", faceMood:"Expression", photoNote:"Photos are read on this phone only. A photo you pick as your face is shrunk and saved in the trip.", changeFace:"🎨 Change face",
   deleteNote:"Your trip and photos are deleted 14 days after the last expense, or 30 days after you create it.", createBtn:"Create trip", creating:"Creating...", back:"Back",
-  needNames:"Fill in every name", dupNames:"Two people have the same name", needTripName:"Give the trip a name",
+  needNames:"Fill in every name", dupNames:"Two people have the same name. Add a letter, like Waleed M", needTripName:"Give the trip a name",
   shareTitle:"Trip ready!", shareBody:"Send this link to the group. Each person opens it and picks their name.",
   shareWA:"Share on WhatsApp", copyLink:"Copy link", openTrip:"Open the trip", copied:"Copied ✓",
   waText:"Join our trip \"{name}\" on Shella and add what you pay:\n{link}",
@@ -508,7 +509,7 @@ ar: {
   fmFail:"أداة الوش محملتش. اختار الألوان بنفسك.", skin:"البشرة", hairColour:"لون الشعر", hair:"الشعر", beard:"الدقن",
   glasses:"النضارة", faceMood:"التعبير", photoNote:"الصور بتتقري على الموبايل ده بس. الصورة اللي تختارها وش بتتصغر وتتحفظ في الرحلة.", changeFace:"🎨 غيّر الوش",
   deleteNote:"الرحلة والصور بيتمسحوا بعد ١٤ يوم من آخر مصروف، أو بعد ٣٠ يوم من عملها.", createBtn:"اعمل الرحلة", creating:"بنعملها...", back:"رجوع",
-  needNames:"اكتب اسم كل واحد", dupNames:"فيه اتنين بنفس الاسم", needTripName:"سمّي الرحلة",
+  needNames:"اكتب اسم كل واحد", dupNames:"فيه اتنين بنفس الاسم. زوّد حرف، زي وليد م", needTripName:"سمّي الرحلة",
   shareTitle:"الرحلة جاهزة!", shareBody:"ابعت اللينك ده للشلة. كل واحد يفتحه ويختار اسمه.",
   shareWA:"ابعت على واتساب", copyLink:"انسخ اللينك", openTrip:"افتح الرحلة", copied:"اتنسخ ✓",
   waText:"تعالى على رحلتنا \"{name}\" على Shella وسجل اللي بتدفعه:\n{link}",
@@ -1136,7 +1137,7 @@ function softDelete(x, del) {
 
 /* ---------- menu ---------- */
 $("meBtn").addEventListener("click", () => drawMenu(true));
-let pendingAvatar = null;
+let pendingAvatar = null, binOpen = false;
 function drawMenu(open) {
   const p = people[me]; if (!p) return;
   const av = pendingAvatar || p.avatar;
@@ -1150,12 +1151,6 @@ function drawMenu(open) {
     <button class="ghost" data-act="summary">${t("copySummary")}</button>
     <button class="ghost" data-lang>${t("langSwitch")}</button>`;
   if (deferredInstall) h += `<button class="ghost" data-act="install">${t("install")}</button>`;
-
-  const bin = items.filter(x => x.deleted);
-  h += `<div class="mhead">${t("undoBin")}</div>`;
-  h += bin.length ? bin.map(x => `<div class="mrow">${face(x.paidBy)}<div class="grow">${esc(x.type === "settle" ? t("xPaidY", { a: nameOf(x.paidBy), b: nameOf(x.split[0]) }) : (x.desc || t("cat_" + x.cat)))}<small>${fmt(x.amount)} ${trip.currency}</small></div>
-      ${(x.paidBy === me || isMaker()) ? `<button class="mbtn" data-act="restore" data-id="${x.id}">${t("restore")}</button>` : ""}</div>`).join("")
-    : `<div class="note" style="text-align:start">${t("undoEmpty")}</div>`;
 
   if (!isMaker() && trip.backup === me) {
     h += `<div class="mhead">${t("backupMaker")}</div><div class="note" style="text-align:start">${esc(t("youAreBackup", { maker: nameOf(makerPid()) }))}</div>`;
@@ -1183,8 +1178,15 @@ function drawMenu(open) {
     h += friends.length ? `<div class="chips" style="margin-top:8px">${friends.map(pid => `<button class="chip${trip.backup === pid ? " on" : ""}" data-act="setBackup" data-id="${pid}">${esc(nameOf(pid))}</button>`).join("")}</div>`
       : `<div class="note" style="text-align:start">${t("noJoined")}</div>`;
     if (friends.length) h += `<div class="mhead">${t("handTitle")}</div><div class="chips">${friends.map(pid => `<button class="chip" data-act="handOver" data-id="${pid}">👑 ${esc(nameOf(pid))}</button>`).join("")}</div>`;
-    h += `<button class="del" data-act="deleteTrip">🗑️ ${t("deleteTrip")}</button>`;
+    h += "<!--BIN-->" + `<button class="del" data-act="deleteTrip">🗑️ ${t("deleteTrip")}</button>`;
   }
+  // Undo bin: folded near the bottom (above "Delete this trip"), so a long list never pushes the rest down.
+  const bin = items.filter(x => x.deleted);
+  let bh = `<button class="ghost bintoggle" data-act="toggleBin">🗑️ ${t("undoBin")} (${bin.length}) <span>${binOpen ? "▴" : "▾"}</span></button>`;
+  if (binOpen) bh += bin.length ? bin.map(x => `<div class="mrow">${face(x.paidBy)}<div class="grow">${esc(x.type === "settle" ? t("xPaidY", { a: nameOf(x.paidBy), b: nameOf(x.split[0]) }) : (x.desc || t("cat_" + x.cat)))}<small>${fmt(x.amount)} ${trip.currency}</small></div>
+      ${(x.paidBy === me || isMaker()) ? `<button class="mbtn" data-act="restore" data-id="${x.id}">${t("restore")}</button>` : ""}</div>`).join("")
+    : `<div class="note" style="text-align:start">${t("undoEmpty")}</div>`;
+  h = h.includes("<!--BIN-->") ? h.replace("<!--BIN-->", bh) : h + bh;
   $("menuBody").innerHTML = h;
   if (open) openLayer("menu");
 }
@@ -1196,7 +1198,8 @@ $("menuBody").addEventListener("input", (e) => {
 $("menuBody").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act;
-  if (act === "face") openFaceMaker(pendingAvatar || people[me].avatar, colorOf(me), a => { pendingAvatar = a; drawMenu(); });
+  if (act === "toggleBin") { binOpen = !binOpen; drawMenu(); }
+  else if (act === "face") openFaceMaker(pendingAvatar || people[me].avatar, colorOf(me), a => { pendingAvatar = a; drawMenu(); });
   else if (act === "saveProfile") {
     const ip = cleanIpay($("ipIn").value);
     if (ip === null) return toast(t("badIpay"));
@@ -1273,8 +1276,10 @@ function pickPhoto(cb) {
       const S = 144, c = document.createElement("canvas"); c.width = c.height = S;
       const s = Math.min(img.width, img.height);
       c.getContext("2d").drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, S, S);
+      // Kept under 28 KB (the rules allow 30 KB); a normal face photo lands around 8 to 15 KB.
       let q = 0.8, data = c.toDataURL("image/jpeg", q);
-      while (data.length > 55000 && q > 0.3) { q -= 0.15; data = c.toDataURL("image/jpeg", q); }
+      while (data.length > 28000 && q > 0.3) { q -= 0.1; data = c.toDataURL("image/jpeg", q); }
+      if (data.length > 28000) { c.width = c.height = 96; c.getContext("2d").drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 96, 96); data = c.toDataURL("image/jpeg", 0.5); }
       URL.revokeObjectURL(img.src);
       cb({ k: "photo", v: data });
     };
