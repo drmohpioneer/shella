@@ -44,7 +44,8 @@ input,select{font:inherit}
 .brand{font-family:var(--head);font-weight:800;font-size:26px;letter-spacing:.2px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brand span{color:var(--sun)}
 .me{display:flex;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--line);
-  padding:4px 12px 4px 4px;border-radius:99px;font-weight:600;font-size:14px;flex-shrink:0}
+  padding:4px 12px 4px 4px;border-radius:99px;font-weight:600;font-size:14px;flex-shrink:0;max-width:52%}
+.me .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} /* a long name must not push the trip name out of the header */
 [dir=rtl] .me{padding:4px 4px 4px 12px}
 .me img{width:34px;height:34px;border-radius:50%;background:var(--c)}
 .homebtn{width:42px;height:42px;border-radius:50%;background:var(--card2);border:1px solid var(--line);font-size:19px;flex-shrink:0;display:grid;place-items:center}
@@ -220,6 +221,17 @@ select.field option{color:#000}
 .toast.on{transform:translate(-50%,0)}
 .sync{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin:0 6px;box-shadow:0 0 8px var(--green)}
 .sync.off{background:var(--sun);box-shadow:0 0 8px var(--sun)}
+/* face maker */
+#faceScreen{z-index:70}
+.fm-big{width:150px;height:150px;border-radius:50%;background:var(--c);margin:4px auto 12px;overflow:hidden}
+.fm-big img{width:100%;height:100%;display:block}
+.fm-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.fm-row::-webkit-scrollbar{display:none}
+.fm-opt{flex-shrink:0;width:60px;height:60px;border-radius:50%;background:var(--c);border:3px solid transparent;padding:0;overflow:hidden}
+.fm-opt img{width:100%;height:100%;display:block}
+.fm-opt.on{border-color:#fff}
+.fm-sw{flex-shrink:0;width:40px;height:40px;border-radius:50%;border:3px solid transparent;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+.fm-sw.on{border-color:#fff}
 .spin{display:inline-block;width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--sun);border-radius:50%;animation:sp 1s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 </style>
@@ -246,6 +258,7 @@ select.field option{color:#000}
 </header>
 
 <main class="wrap hide" id="main">
+  <div id="rescue"></div>
   <div id="tip"></div>
   <div id="expiry"></div>
   <section>
@@ -380,6 +393,27 @@ select.field option{color:#000}
   </div>
 </div>
 
+<!-- face maker -->
+<div class="full" id="faceScreen">
+  <div class="box form">
+    <h1 style="text-align:center" data-t="faceTitle"></h1>
+    <div class="fm-big" id="fmBig"></div>
+    <div class="row2"><button class="ghost" id="fmPhoto" style="margin-top:0"></button><button class="ghost" id="fmDice" style="margin-top:0"></button></div>
+    <div class="lbl" data-t="orCartoon"></div>
+    <button class="ghost" id="fmCopy" style="margin-top:0"></button>
+    <div class="note" id="fmStatus"></div>
+    <div class="lbl" data-t="skin"></div><div class="fm-row" data-fm="skin"></div>
+    <div class="lbl" data-t="hairColour"></div><div class="fm-row" data-fm="hair"></div>
+    <div class="lbl" data-t="hair"></div><div class="fm-row" data-fm="top"></div>
+    <div class="lbl" data-t="beard"></div><div class="fm-row" data-fm="beard"></div>
+    <div class="lbl" data-t="glasses"></div><div class="fm-row" data-fm="glasses"></div>
+    <div class="lbl" data-t="faceMood"></div><div class="fm-row" data-fm="mood"></div>
+    <button class="save" id="fmSave" data-t="useCartoon"></button>
+    <button class="ghost" id="fmBack" data-t="back"></button>
+    <p class="note" data-t="photoNote"></p>
+  </div>
+</div>
+
 <input type="file" accept="image/*" id="photoIn" class="hide">
 <div class="toast" id="toast"></div>
 
@@ -391,6 +425,7 @@ import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, writeBatch, onSnapshot, serverTimestamp, increment, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { createAvatar } from "https://cdn.jsdelivr.net/npm/@dicebear/core@9.4.2/+esm";
 import * as lorelei from "https://cdn.jsdelivr.net/npm/@dicebear/lorelei@9.4.2/+esm";
+import * as avataaars from "https://cdn.jsdelivr.net/npm/@dicebear/avataaars@9.4.2/+esm";
 
 // Public web config (Firebase web keys are public by design; the security lives in firestore.rules).
 const FIREBASE_CONFIG = /*FIREBASE_CONFIG*/{"apiKey": "AIzaSyAE1uXoIOJYMlfk5O7ApK8TRVZncGf2mMg", "authDomain": "shella-app-c406f.firebaseapp.com", "projectId": "shella-app-c406f", "storageBucket": "shella-app-c406f.firebasestorage.app", "messagingSenderId": "671376658589", "appId": "1:671376658589:web:74a1d6113724aa32a9c474"};
@@ -406,7 +441,12 @@ const T = {
 en: {
   appTag:"Split group expenses with your crew. No signup, no drama.", create:"Create a trip", yourTrips:"Your trips",
   gotLink:"Got a link from a friend? Just open it, or paste it here.", pasteLink:"Paste a trip link", openBtn:"Open", badLink:"That's not a Shella trip link", tripNamePh:"Trip name (Dahab weekend, Friday dinner...)",
-  names:"Who's coming?", namePh:"Name", thisIsMe:"Me", tapFace:"Tap a face to change it, 📷 for a photo. Tap \"Me\" on your own row.",
+  names:"Who's coming?", namePh:"Name", thisIsMe:"Me", tapFace:"Tap a face to change it: a photo, a cartoon, or random. Tap \"Me\" on your own row.",
+  faceTitle:"Pick a face", usePhoto:"📷 My photo", randomFace:"🎲 Random", orCartoon:"Or make a cartoon", copyColours:"✨ Copy my colours from a photo",
+  useCartoon:"Use this cartoon", fmLoading:"Loading the face finder (first time only)...", fmLooking:"Looking at your photo...",
+  fmDone:"Skin and hair colour copied. Now pick the hair, beard and glasses.", fmNoFace:"Couldn't find a face. Pick the colours yourself.",
+  fmFail:"The face finder didn't load. Pick the colours yourself.", skin:"Skin", hairColour:"Hair colour", hair:"Hair", beard:"Beard",
+  glasses:"Glasses", faceMood:"Expression", photoNote:"Photos are read on this phone only. A photo you pick as your face is shrunk and saved in the trip.", changeFace:"🎨 Change face",
   deleteNote:"Your trip and photos are deleted 14 days after the last expense.", createBtn:"Create trip", creating:"Creating...", back:"Back",
   needNames:"Fill in every name", dupNames:"Two people have the same name", needTripName:"Give the trip a name",
   shareTitle:"Trip ready!", shareBody:"Send this link to the group. Each person opens it and picks their name.",
@@ -445,14 +485,27 @@ en: {
   waiting:"not joined yet", joined:"joined 🔒", addPerson:"Add person", addPersonPh:"New person's name", you:"you", maker:"trip maker",
   shuffle:"Shuffle face", photo:"Photo", saved:"Saved ✓", ipay:"InstaPay: {h}", madeWith:"Made with Shella", total:"Total",
   install:"Install Shella", ahlan:"Ahlan {name}! 🌴", allSquareBoom:"All square! Yalla, next trip 🎉", marked:"Marked as paid 💸",
-  undoSettle:"Undo this settlement?", settleUndone:"Settlement undone", dbErr:"Can't reach the database",
+  backupMaker:"Backup maker", youAreBackup:"You're the backup maker. You have no extra powers, unless {maker} loses their phone.",
+  backupNote:"If you lose your phone, your backup can take over the trip after 24 hours. Pick a friend who has joined.",
+  lostPhone:"{maker} lost their phone", lostConfirm:"Start a 24 hour countdown? Everyone will see it. If {maker} opens Shella in that time, it's cancelled. If not, you become the trip maker.",
+  rescueBanner:"⏳ {by} says {maker} lost their phone. {by} becomes the trip maker on {time}, unless {maker} opens Shella.",
+  rescueReady:"24 hours passed and {maker} didn't come back. You can become the trip maker now.", becomeMaker:"Become the maker", cancelRescue:"Cancel",
+  rescueCancelled:"{name} thought you lost your phone. Cancelled ✓", nowMaker:"You're the trip maker now. Unlock {name}'s name so they can come back.",
+  handTitle:"Give the maker role to a friend", makeMakerConfirm:"Make {name} the trip maker? You'll become the backup.", madeMaker:"{name} is the trip maker now",
+  backupTag:"backup ⭐", makerTag:"trip maker 👑", noJoined:"Nobody else has joined yet.",
+  undoSettle:"Undo this settlement?", settleUndone:"Settlement undone", dbErr:"Can't reach the database", retry:"Try again",
   agoNow:"just now", agoM:"{n}m ago", agoH:"{n}h ago", agoD:"{n}d ago",
   cat_food:"Food", cat_cafe:"Cafe", cat_transport:"Transport", cat_stay:"Stay", cat_groceries:"Groceries", cat_fun:"Fun", cat_tickets:"Tickets", cat_other:"Other",
 },
 ar: {
   appTag:"حسابات الشلة في مكان واحد. من غير تسجيل ولا خناق.", create:"اعمل رحلة", yourTrips:"رحلاتك",
   gotLink:"صاحبك بعتلك لينك؟ افتحه بس، أو الصقه هنا.", pasteLink:"الصق لينك الرحلة", openBtn:"افتح", badLink:"ده مش لينك رحلة على Shella", tripNamePh:"اسم الرحلة (ويكند دهب، عشا الخميس...)",
-  names:"مين جاي؟", namePh:"الاسم", thisIsMe:"أنا", tapFace:"دوس على الوش يتغير، و📷 لو عايز صورة. ودوس \"أنا\" جنب اسمك.",
+  names:"مين جاي؟", namePh:"الاسم", thisIsMe:"أنا", tapFace:"دوس على الوش تغيره: صورة، كارتون، أو عشوائي. ودوس \"أنا\" جنب اسمك.",
+  faceTitle:"اختار وش", usePhoto:"📷 صورتي", randomFace:"🎲 عشوائي", orCartoon:"أو اعمل كارتون", copyColours:"✨ خد ألواني من صورة",
+  useCartoon:"استخدم الكارتون ده", fmLoading:"بنحمّل أداة الوش (أول مرة بس)...", fmLooking:"بنبص على الصورة...",
+  fmDone:"خدنا لون البشرة والشعر. اختار بقى الشعر والدقن والنضارة.", fmNoFace:"ملقيناش وش في الصورة. اختار الألوان بنفسك.",
+  fmFail:"أداة الوش محملتش. اختار الألوان بنفسك.", skin:"البشرة", hairColour:"لون الشعر", hair:"الشعر", beard:"الدقن",
+  glasses:"النضارة", faceMood:"التعبير", photoNote:"الصور بتتقري على الموبايل ده بس. الصورة اللي تختارها وش بتتصغر وتتحفظ في الرحلة.", changeFace:"🎨 غيّر الوش",
   deleteNote:"الرحلة والصور بيتمسحوا بعد ١٤ يوم من آخر مصروف.", createBtn:"اعمل الرحلة", creating:"بنعملها...", back:"رجوع",
   needNames:"اكتب اسم كل واحد", dupNames:"فيه اتنين بنفس الاسم", needTripName:"سمّي الرحلة",
   shareTitle:"الرحلة جاهزة!", shareBody:"ابعت اللينك ده للشلة. كل واحد يفتحه ويختار اسمه.",
@@ -491,7 +544,15 @@ ar: {
   waiting:"لسه مدخلش", joined:"دخل 🔒", addPerson:"ضيف شخص", addPersonPh:"اسم الشخص الجديد", you:"إنت", maker:"صاحب الرحلة",
   shuffle:"غيّر الوش", photo:"صورة", saved:"اتحفظ ✓", ipay:"InstaPay: {h}", madeWith:"معمول بـ Shella", total:"الإجمالي",
   install:"نزّل Shella", ahlan:"أهلا يا {name}! 🌴", allSquareBoom:"كله خالص! يلا على الرحلة الجاية 🎉", marked:"اتسجل إنه دفع 💸",
-  undoSettle:"تلغي التسوية دي؟", settleUndone:"التسوية اتلغت", dbErr:"مش قادرين نوصل للداتا",
+  backupMaker:"صاحب الرحلة الاحتياطي", youAreBackup:"إنت صاحب الرحلة الاحتياطي. مالكش صلاحيات زيادة، إلا لو موبايل {maker} ضاع.",
+  backupNote:"لو موبايلك ضاع، الاحتياطي يقدر ياخد الرحلة بعد ٢٤ ساعة. اختار حد من اللي دخلوا.",
+  lostPhone:"موبايل {maker} ضاع", lostConfirm:"نبدأ عد تنازلي ٢٤ ساعة؟ الكل هيشوفه. لو {maker} فتح Shella في الوقت ده هيتلغي. لو مفتحش، هتبقى إنت صاحب الرحلة.",
+  rescueBanner:"⏳ {by} بيقول إن موبايل {maker} ضاع. {by} هيبقى صاحب الرحلة يوم {time}، إلا لو {maker} فتح Shella.",
+  rescueReady:"عدّت ٢٤ ساعة و{maker} مرجعش. تقدر تبقى صاحب الرحلة دلوقتي.", becomeMaker:"خليني صاحب الرحلة", cancelRescue:"إلغاء",
+  rescueCancelled:"{name} افتكر إن موبايلك ضاع. اتلغى ✓", nowMaker:"إنت صاحب الرحلة دلوقتي. فك قفل اسم {name} عشان يرجع.",
+  handTitle:"ادي دور صاحب الرحلة لحد تاني", makeMakerConfirm:"تخلي {name} صاحب الرحلة؟ وإنت هتبقى الاحتياطي.", madeMaker:"{name} بقى صاحب الرحلة",
+  backupTag:"احتياطي ⭐", makerTag:"صاحب الرحلة 👑", noJoined:"لسه محدش تاني دخل.",
+  undoSettle:"تلغي التسوية دي؟", settleUndone:"التسوية اتلغت", dbErr:"مش قادرين نوصل للداتا", retry:"جرب تاني",
   agoNow:"دلوقتي", agoM:"من {n} دقيقة", agoH:"من {n} ساعة", agoD:"من {n} يوم",
   cat_food:"أكل", cat_cafe:"كافيه", cat_transport:"مواصلات", cat_stay:"سكن", cat_groceries:"سوبرماركت", cat_fun:"فسحة", cat_tickets:"تذاكر", cat_other:"تاني",
 },
@@ -505,13 +566,15 @@ const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },
 };
-let lang = store.get("lang") || ((navigator.language || "").startsWith("ar") ? "ar" : "en");
+// Only "en" or "ar": an unknown stored value would make every t() throw and the app never render.
+let lang = ["en", "ar"].includes(store.get("lang")) ? store.get("lang") : ((navigator.language || "").startsWith("ar") ? "ar" : "en");
 function t(k, v = {}) { return String(T[lang][k] ?? T.en[k] ?? k).replace(/\{(\w+)\}/g, (_, x) => v[x] ?? ""); }
 function applyLang() {
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
   document.querySelectorAll("[data-t]").forEach(el => el.textContent = t(el.dataset.t));
   document.querySelectorAll("[data-lang]").forEach(el => el.textContent = t("langSwitch"));
+  $("fmPhoto").textContent = t("usePhoto"); $("fmDice").textContent = t("randomFace"); $("fmCopy").textContent = t("copyColours");
   $("fDesc").placeholder = t("descPh"); $("cName").placeholder = t("tripNamePh"); $("pasteIn").placeholder = t("pasteLink");
 }
 function setLang(l) { lang = l; store.set("lang", l); applyLang(); rerender(); }
@@ -524,8 +587,43 @@ function avatarSrc(a) {
   if (!a || typeof a.v !== "string") return "";
   // Only our own shrunk photos are shown; anything else (remote URLs, markup) is ignored.
   if (a.k === "photo") return PHOTO_RE.test(a.v) ? a.v : "";
-  if (!diceCache.has(a.v)) diceCache.set(a.v, createAvatar(lorelei, { seed: a.v }).toDataUri());
-  return diceCache.get(a.v);
+  const key = a.k + ":" + a.v;
+  if (!diceCache.has(key)) {
+    if (a.k === "face") { const o = faceOpts(a.v); diceCache.set(key, o ? faceSvg(o) : ""); }
+    else if (a.k === "dice") diceCache.set(key, createAvatar(lorelei, { seed: a.v }).toDataUri());
+    else return "";
+  }
+  return diceCache.get(key);
+}
+
+/* ---------- cartoon faces (avataaars). Stored as a short code, e.g. "s2h0t1b0g0m0" (same shape as firestore.rules) ---------- */
+const FM = {
+  skin: ["ffdbb4", "edb98a", "d08b5b", "ae5d29", "614335"],
+  hair: ["2c1b18", "4a312c", "724133", "a55728", "b58143", "d6b370", "c93305", "e8e1e1"],
+  top: ["shortFlat", "shortWaved", "shortCurly", "shortRound", "theCaesar", "theCaesarAndSidePart", "sides", "frizzle", "fro", "shavedSides",
+    "curly", "straight01", "straight02", "bob", "bun", "longButNotTooLong", "bigHair", "curvy", "hijab", "turban", null],
+  beard: [null, "beardLight", "beardMedium", "beardMajestic", "moustacheFancy", "moustacheMagnum"],
+  glasses: [null, "prescription01", "prescription02", "round", "wayfarers", "sunglasses"],
+  mood: [["happy", "smile", "defaultNatural"], ["default", "default", "defaultNatural"], ["wink", "twinkle", "raisedExcitedNatural"],
+    ["squint", "tongue", "upDownNatural"], ["side", "serious", "flatNatural"], ["surprised", "screamOpen", "raisedExcited"]],
+};
+const FACE_RE = /^s(\d)h(\d)t(\d{1,2})b(\d)g(\d)m(\d)$/;
+function faceOpts(v) {
+  const m = FACE_RE.exec(String(v)); if (!m) return null;
+  const o = { skin: +m[1], hair: +m[2], top: +m[3], beard: +m[4], glasses: +m[5], mood: +m[6] };
+  return Object.keys(o).every(k => o[k] < FM[k].length) ? o : null;
+}
+const faceCode = (o) => `s${o.skin}h${o.hair}t${o.top}b${o.beard}g${o.glasses}m${o.mood}`;
+function faceSvg(o) {
+  const top = FM.top[o.top], beard = FM.beard[o.beard], gl = FM.glasses[o.glasses], m = FM.mood[o.mood];
+  return createAvatar(avataaars, {
+    seed: "shella", skinColor: [FM.skin[o.skin]], hairColor: [FM.hair[o.hair]], facialHairColor: [FM.hair[o.hair]],
+    top: [top || "shortFlat"], topProbability: top ? 100 : 0,
+    facialHair: [beard || "beardLight"], facialHairProbability: beard ? 100 : 0,
+    accessories: [gl || "round"], accessoriesProbability: gl ? 100 : 0,
+    accessoriesColor: ["262e33"], hatColor: ["3c4f5c"], clothing: ["shirtCrewNeck"], clothesColor: ["25557c"],
+    eyes: [m[0]], mouth: [m[1]], eyebrows: [m[2]],
+  }).toDataUri();
 }
 const newDice = () => ({ k: "dice", v: randId(6) });
 const colorOf = (pid) => COLORS[(parseInt(String(pid).slice(1), 10) - 1) % COLORS.length] || COLORS[0];
@@ -603,6 +701,32 @@ const peopleCol = () => collection(db, "trips", TRIP, "people");
 const expCol = () => collection(db, "trips", TRIP, "expenses");
 const memberRef = () => doc(db, "trips", TRIP, "members", uid);
 const isMaker = () => trip && uid && trip.maker === uid;
+const makerPid = () => order.find(pid => people[pid]?.uid && people[pid].uid === trip?.maker) || null;
+const joinedFriends = () => order.filter(pid => people[pid]?.uid && pid !== me);
+const RESCUE_MS = 24 * 3600000;
+function whenText(ms) {
+  return new Date(ms).toLocaleString(lang === "ar" ? "ar-EG" : "en-GB", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+}
+function tripWrite(fields, okMsg) {
+  const batch = writeBatch(db); batch.update(tripRef(), fields);
+  return timeout(batch.commit(), 15000).then(() => { if (okMsg) toast(okMsg); return true; })
+    .catch(() => { toast(navigator.onLine ? t("saveFail") : t("needNet")); return false; });
+}
+// Runs on every render: the maker's phone is clearly alive, so a "lost phone" countdown is cancelled;
+// and the first friend to open the trip fills the empty backup slot.
+let roleBusy = false;
+function syncRoles() {
+  if (!trip || !me || roleBusy || trip.deletedAt) return;
+  if (isMaker() && trip.rescueAt) {
+    roleBusy = true; const by = trip.rescueBy;
+    const batch = writeBatch(db); batch.update(tripRef(), { rescueAt: null, rescueBy: null });
+    batch.commit().then(() => toast(t("rescueCancelled", { name: nameOf(by) }))).catch(() => {}).finally(() => { roleBusy = false; });
+  } else if (!isMaker() && !trip.backup) {
+    roleBusy = true;
+    const batch = writeBatch(db); batch.update(tripRef(), { backup: me });
+    batch.commit().catch(() => {}).finally(() => { roleBusy = false; });
+  }
+}
 const tripLink = (id) => `${location.origin}${location.pathname}#t=${id}`;
 const nameOf = (pid) => people[pid]?.name || "?";
 function face(pid, cls = "") {
@@ -616,14 +740,21 @@ function rememberTrip() {
   store.set("myTrips", JSON.stringify(list));
 }
 function bump(batch) { batch.update(tripRef(), { lastActivity: serverTimestamp() }); }
+// Gone or locked (expired, deleted 3+ days ago): drop it from the home list so it stops showing a dead link.
+function notFound() {
+  let list = [];
+  try { list = JSON.parse(store.get("myTrips") || "[]"); } catch {}
+  store.set("myTrips", JSON.stringify(list.filter(x => x.id !== TRIP)));
+  msg("🧭", t("notFoundTitle"), t("notFoundBody"));
+}
 
 function openTrip() {
   msg('<span class="spin"></span>', t("loading"), "", false);
   onSnapshot(tripRef(), (s) => {
-    if (!s.exists()) { stopAll(); return msg("🧭", t("notFoundTitle"), t("notFoundBody")); }
+    if (!s.exists()) { stopAll(); return notFound(); }
     trip = s.data({ serverTimestamps: "estimate" });
     rememberTrip(); route();
-  }, () => { stopAll(); msg("🧭", t("notFoundTitle"), t("notFoundBody")); });
+  }, () => { stopAll(); notFound(); });
   onSnapshot(peopleCol(), (s) => {
     people = {}; s.docs.forEach(d => people[d.id] = d.data());
     order = Object.keys(people).sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
@@ -768,11 +899,21 @@ function render() {
   const expenses = live().filter(x => x.type !== "settle");
   const cur = trip.currency;
   $("brand").innerHTML = `Shel<span>la</span> · ${esc(trip.name)}`;
-  $("meBtn").innerHTML = `${face(me)}${esc(nameOf(me))}`;
+  $("meBtn").innerHTML = `${face(me)}<span class="nm">${esc(nameOf(me))}</span>`;
   $("cur").textContent = cur; $("fCur").textContent = cur;
   animateTotal(total);
   $("sub").innerHTML = `<span class="sync${navigator.onLine ? "" : " off"}"></span>${t("peopleN", { n: order.length })} · ${t("expensesN", { n: expenses.length })}`;
   $("crew").innerHTML = order.map(pid => face(pid)).join("");
+
+  const mk = makerPid();
+  if (trip.rescueAt && !isMaker()) {
+    const at = tsMs(trip.rescueAt) + RESCUE_MS, mine = trip.rescueBy === me;
+    const ready = mine && trip.backup === me && Date.now() > at;
+    $("rescue").innerHTML = `<div class="banner"><span class="grow">${esc(ready ? t("rescueReady", { maker: nameOf(mk) })
+      : t("rescueBanner", { by: nameOf(trip.rescueBy), maker: nameOf(mk), time: whenText(at) }))}</span>
+      ${ready ? `<button data-r="take">${t("becomeMaker")}</button>` : ""}${mine ? `<button class="later" data-r="cancel">${t("cancelRescue")}</button>` : ""}</div>`;
+  } else $("rescue").innerHTML = "";
+  syncRoles();
 
   $("tip").innerHTML = isAndroid && !standalone && store.get("androidTip") !== "1"
     ? `<div class="banner"><span class="grow">${t("androidTip")}</span>${deferredInstall ? `<button data-tip="install">${t("install")}</button>` : ""}<button class="later" data-tip="ok">${t("gotIt")}</button></div>` : "";
@@ -808,9 +949,10 @@ function render() {
     : `<div class="allgood"><div class="big">🤙</div><b>${t("allSquare")}</b>${expenses.length ? t("allSquareSub") : t("firstExp")}</div>`;
   $("settle").onclick = async (e) => {
     const c = e.target.closest("[data-copy]"); if (c) return copy(c.dataset.copy);
-    const b = e.target.closest(".btn-paid"); if (!b) return;
+    const b = e.target.closest(".btn-paid"); if (!b || b.disabled) return;
     const s = plan[+b.dataset.i];
     if (!confirm(t("paidConfirm", { a: nameOf(s.from), b: nameOf(s.to), amt: `${fmt(s.amount)} ${cur}` }))) return;
+    b.disabled = true;
     saveNew({ type: "settle", desc: "", cat: "settle", amount: Math.round(s.amount * 100) / 100, paidBy: s.from, split: [s.to] });
     if (!settlements(computeBalances().net).length) boom(); else toast(t("marked"));
   };
@@ -847,6 +989,16 @@ $("list").addEventListener("click", (e) => {
   openSheet(items.find(x => x.id === b.dataset.id));
 });
 $("expiry").addEventListener("click", (e) => { if (e.target.id === "sumBtn") copy(summaryText()); });
+$("rescue").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-r]"); if (!b || b.disabled) return;
+  b.disabled = true;
+  if (b.dataset.r === "cancel") await tripWrite({ rescueAt: null, rescueBy: null });
+  else if (b.dataset.r === "take") {
+    const old = makerPid();
+    await tripWrite({ maker: uid, backup: null, rescueAt: null, rescueBy: null, open: true }, t("nowMaker", { name: nameOf(old) }));
+  }
+  b.disabled = false;
+});
 $("tip").addEventListener("click", (e) => {
   const b = e.target.closest("[data-tip]"); if (!b) return;
   if (b.dataset.tip === "install" && deferredInstall) { deferredInstall.prompt(); deferredInstall = null; }
@@ -942,6 +1094,9 @@ $("addBtn").addEventListener("click", () => {
   openSheet();
 });
 $("saveBtn").addEventListener("click", () => {
+  // The sheet takes .35s to slide away; a double tap in that window must not save twice.
+  if ($("saveBtn").disabled) return;
+  $("saveBtn").disabled = true;
   const data = {
     amount: Math.round(amountVal() * 100) / 100, desc: $("fDesc").value.trim().slice(0, 60),
     cat: fCat, split: order.filter(id => fSplit.has(id)),
@@ -985,7 +1140,7 @@ function drawMenu(open) {
   const av = pendingAvatar || p.avatar;
   $("menuTitle").textContent = t("myProfile");
   let h = `<div class="prow"><div class="pav" style="--c:${colorOf(me)}"><img src="${esc(avatarSrc(av))}" alt=""></div>
-      <button class="mbtn" data-act="shuffle">🎲 ${t("shuffle")}</button><button class="mbtn" data-act="photo">📷 ${t("photo")}</button></div>
+      <button class="mbtn" data-act="face">${t("changeFace")}</button></div>
     <input class="field" id="ipIn" maxlength="400" autocomplete="off" inputmode="url" dir="ltr" placeholder="${esc(t("instapayPh"))}" value="${esc(p.instapay || "")}">
     <div class="note" style="text-align:start">${t("instapay")}</div>
     <button class="save" data-act="saveProfile">${t("save")}</button>
@@ -999,6 +1154,10 @@ function drawMenu(open) {
       ${(x.paidBy === me || isMaker()) ? `<button class="mbtn" data-act="restore" data-id="${x.id}">${t("restore")}</button>` : ""}</div>`).join("")
     : `<div class="note" style="text-align:start">${t("undoEmpty")}</div>`;
 
+  if (!isMaker() && trip.backup === me) {
+    h += `<div class="mhead">${t("backupMaker")}</div><div class="note" style="text-align:start">${esc(t("youAreBackup", { maker: nameOf(makerPid()) }))}</div>`;
+    if (!trip.rescueAt) h += `<button class="del" data-act="lostPhone">📵 ${esc(t("lostPhone", { maker: nameOf(makerPid()) }))}</button>`;
+  }
   if (isMaker()) {
     h += `<div class="mhead">${t("tripSettings")}</div>
       <button class="save" data-act="share">${t("shareLink")}</button>
@@ -1006,7 +1165,7 @@ function drawMenu(open) {
         <button class="mbtn" data-act="toggleOpen">${trip.open ? t("closeJoin") : t("openJoin")}</button></div>`;
     h += order.map(pid => {
       const q = people[pid];
-      const tag = pid === me ? t("you") : q.uid ? t("joined") : t("waiting");
+      const tag = (pid === me ? t("you") : q.uid ? t("joined") : t("waiting")) + (trip.backup === pid ? " · " + t("backupTag") : "");
       return `<div class="mrow">${face(pid)}<div class="grow">${esc(q.name)}<small>${tag}</small></div>
         ${q.uid && pid !== me ? `<button class="mbtn warn2" data-act="unlock" data-id="${pid}">${t("unlock")}</button>` : ""}</div>`;
     }).join("");
@@ -1014,6 +1173,11 @@ function drawMenu(open) {
       h += `<div class="prow"><input class="field" id="newPerson" maxlength="24" autocomplete="off" placeholder="${esc(t("addPersonPh"))}">
         <button class="mbtn" data-act="addPerson">+ ${t("addPerson")}</button></div>`;
     }
+    const friends = joinedFriends();
+    h += `<div class="mhead">${t("backupMaker")}</div><div class="note" style="text-align:start;margin-top:0">${t("backupNote")}</div>`;
+    h += friends.length ? `<div class="chips" style="margin-top:8px">${friends.map(pid => `<button class="chip${trip.backup === pid ? " on" : ""}" data-act="setBackup" data-id="${pid}">${esc(nameOf(pid))}</button>`).join("")}</div>`
+      : `<div class="note" style="text-align:start">${t("noJoined")}</div>`;
+    if (friends.length) h += `<div class="mhead">${t("handTitle")}</div><div class="chips">${friends.map(pid => `<button class="chip" data-act="handOver" data-id="${pid}">👑 ${esc(nameOf(pid))}</button>`).join("")}</div>`;
     h += `<button class="del" data-act="deleteTrip">🗑️ ${t("deleteTrip")}</button>`;
   }
   $("menuBody").innerHTML = h;
@@ -1027,8 +1191,7 @@ $("menuBody").addEventListener("input", (e) => {
 $("menuBody").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act;
-  if (act === "shuffle") { pendingAvatar = newDice(); drawMenu(); }
-  else if (act === "photo") { pickPhoto(a => { pendingAvatar = a; drawMenu(); }); }
+  if (act === "face") openFaceMaker(pendingAvatar || people[me].avatar, colorOf(me), a => { pendingAvatar = a; drawMenu(); });
   else if (act === "saveProfile") {
     const ip = cleanIpay($("ipIn").value);
     if (ip === null) return toast(t("badIpay"));
@@ -1056,6 +1219,16 @@ $("menuBody").addEventListener("click", async (e) => {
     try { await timeout(batch.commit(), 15000); toast(t("unlocked", { name: q.name })); }
     catch { toast(navigator.onLine ? t("saveFail") : t("needNet")); }
   }
+  else if (act === "setBackup") { if (await tripWrite({ backup: b.dataset.id })) drawMenu(); }
+  else if (act === "handOver") {
+    const pid = b.dataset.id, q = people[pid];
+    if (!q?.uid || !confirm(t("makeMakerConfirm", { name: q.name }))) return;
+    if (await tripWrite({ maker: q.uid, backup: me, rescueAt: null, rescueBy: null }, t("madeMaker", { name: q.name }))) closeLayers();
+  }
+  else if (act === "lostPhone") {
+    if (!confirm(t("lostConfirm", { maker: nameOf(makerPid()) }))) return;
+    if (await tripWrite({ rescueAt: serverTimestamp(), rescueBy: me })) closeLayers();
+  }
   else if (act === "deleteTrip") {
     const typed = prompt(t("deleteTypeName"), "");
     if (typed === null) return;
@@ -1074,7 +1247,8 @@ $("menuBody").addEventListener("click", async (e) => {
     const batch = writeBatch(db);
     batch.set(doc(peopleCol(), "p" + n), { name, avatar: newDice(), instapay: "", uid: null });
     bump(batch);
-    batch.commit().catch(() => toast(t("saveFail")));
+    // Redraw the open menu so the new person shows up in the list right away.
+    batch.commit().then(() => drawMenu()).catch(() => toast(t("saveFail")));
     $("newPerson").value = "";
   }
 });
@@ -1133,9 +1307,8 @@ function resetCreate() {
 function drawRows() {
   $("cCount").textContent = rows.length;
   $("cRows").innerHTML = rows.map((r, i) => `<div class="prow" data-i="${i}">
-    <button class="pav" data-act="shuffle" style="--c:${COLORS[i % COLORS.length]}"><img src="${esc(avatarSrc(r.avatar))}" alt=""></button>
+    <button class="pav" data-act="face" style="--c:${COLORS[i % COLORS.length]}"><img src="${esc(avatarSrc(r.avatar))}" alt=""></button>
     <input class="field" data-act="name" maxlength="24" autocomplete="off" placeholder="${esc(t("namePh"))} ${i + 1}" value="${esc(r.name)}">
-    <button class="cam" data-act="photo">📷</button>
     <button class="mebtn${i === meIdx ? " on" : ""}" data-act="me">${t("thisIsMe")}</button></div>`).join("");
 }
 $("cRows").addEventListener("input", (e) => {
@@ -1144,8 +1317,7 @@ $("cRows").addEventListener("input", (e) => {
 $("cRows").addEventListener("click", (e) => {
   const b = e.target.closest("[data-act]"), row = e.target.closest(".prow"); if (!b || !row) return;
   const i = +row.dataset.i;
-  if (b.dataset.act === "shuffle") { rows[i].avatar = newDice(); drawRows(); }
-  else if (b.dataset.act === "photo") pickPhoto(a => { rows[i].avatar = a; drawRows(); });
+  if (b.dataset.act === "face") openFaceMaker(rows[i].avatar, COLORS[i % COLORS.length], a => { rows[i].avatar = a; drawRows(); });
   else if (b.dataset.act === "me") { meIdx = i; drawRows(); }
 });
 $("cMinus").addEventListener("click", () => { if (rows.length > 2) { rows.pop(); if (meIdx >= rows.length) meIdx = 0; drawRows(); } });
@@ -1189,6 +1361,110 @@ function shareTrip(id, name, fresh = false) {
   if (fresh) window.confetti?.({ particleCount: 120, spread: 90, origin: { y: .6 } });
 }
 
+/* ---------- face maker ---------- */
+let fm = null, fmDone = null;
+function openFaceMaker(current, color, done) {
+  fm = faceOpts(current?.k === "face" ? current.v : "") || { skin: 2, hair: 0, top: 1, beard: 0, glasses: 0, mood: 0 };
+  fmDone = done;
+  $("faceScreen").style.setProperty("--c", color);
+  $("fmStatus").textContent = "";
+  drawFace();
+  $("faceScreen").classList.add("on"); $("faceScreen").scrollTop = 0;
+}
+function closeFaceMaker() { $("faceScreen").classList.remove("on"); fmDone = null; }
+function drawFace() {
+  $("fmBig").innerHTML = `<img src="${faceSvg(fm)}" alt="">`;
+  document.querySelectorAll("[data-fm]").forEach(row => {
+    const k = row.dataset.fm;
+    row.innerHTML = FM[k].map((v, i) => (k === "skin" || k === "hair")
+      ? `<button class="fm-sw${fm[k] === i ? " on" : ""}" data-k="${k}" data-i="${i}" style="background:#${v}"></button>`
+      : `<button class="fm-opt${fm[k] === i ? " on" : ""}" data-k="${k}" data-i="${i}"><img src="${faceSvg({ ...fm, [k]: i })}" alt="" loading="lazy"></button>`).join("");
+  });
+}
+$("faceScreen").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-k]"); if (!b) return;
+  fm[b.dataset.k] = +b.dataset.i; drawFace();
+});
+const finishFace = (a) => { const cb = fmDone; closeFaceMaker(); cb?.(a); };
+$("fmSave").addEventListener("click", () => finishFace({ k: "face", v: faceCode(fm) }));
+$("fmBack").addEventListener("click", closeFaceMaker);
+$("fmDice").addEventListener("click", () => finishFace(newDice()));
+$("fmPhoto").addEventListener("click", () => pickPhoto(a => finishFace(a)));
+$("fmCopy").addEventListener("click", () => pickFile(copyColours));
+
+// Photo -> skin and hair colour, on this phone only (MediaPipe face landmarks; the photo is never uploaded).
+let landmarker = null;
+async function getLandmarker() {
+  if (landmarker) return landmarker;
+  $("fmStatus").textContent = t("fmLoading");
+  const v = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm");
+  const files = await v.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  landmarker = await v.FaceLandmarker.createFromOptions(files, {
+    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task" },
+    runningMode: "IMAGE", numFaces: 1,
+  });
+  return landmarker;
+}
+function lab([r, g, b]) {
+  const f = (c) => { c /= 255; return c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92; };
+  const [R, G, B] = [f(r), f(g), f(b)];
+  const h = (x) => x > 0.008856 ? Math.cbrt(x) : 7.787 * x + 16 / 116;
+  const x = h((R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047), y = h(R * 0.2126 + G * 0.7152 + B * 0.0722), z = h((R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+function nearestIdx(rgb, palette) {
+  const a = lab(rgb); let best = 0, bd = Infinity;
+  palette.forEach((p, i) => {
+    const b = lab([0, 2, 4].map(j => parseInt(p.slice(j, j + 2), 16)));
+    const d = (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2; if (d < bd) { bd = d; best = i; }
+  });
+  return best;
+}
+function sampleMedian(ctx, x, y, r) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const x0 = Math.max(0, Math.round(x - r)), y0 = Math.max(0, Math.round(y - r));
+  const w = Math.min(W - x0, Math.round(2 * r)), h = Math.min(H - y0, Math.round(2 * r));
+  if (w < 1 || h < 1) return null;
+  const d = ctx.getImageData(x0, y0, w, h).data, px = [];
+  for (let i = 0; i < d.length; i += 4) px.push([d[i], d[i + 1], d[i + 2]]);
+  const med = (k) => px.map(p => p[k]).sort((a, b) => a - b)[px.length >> 1];
+  return [med(0), med(1), med(2)];
+}
+function pickFile(cb) {
+  const input = $("photoIn");
+  input.value = "";
+  input.onchange = () => { const f = input.files[0]; if (f) cb(f); };
+  input.click();
+}
+async function copyColours(f) {
+  const url = URL.createObjectURL(f);
+  try {
+    const im = new Image(); im.src = url; await im.decode();
+    const lm = await getLandmarker();
+    $("fmStatus").textContent = t("fmLooking");
+    const S = Math.min(1, 1024 / Math.max(im.width, im.height));
+    const c = document.createElement("canvas"); c.width = Math.round(im.width * S); c.height = Math.round(im.height * S);
+    const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.drawImage(im, 0, 0, c.width, c.height);
+    const pts = lm.detect(c).faceLandmarks?.[0];
+    if (!pts) { $("fmStatus").textContent = t("fmNoFace"); return; }
+    const P = (i) => [pts[i].x * c.width, pts[i].y * c.height];
+    const top = P(10), chin = P(152), faceH = Math.hypot(chin[0] - top[0], chin[1] - top[1]), r = faceH * 0.04;
+    // Skin: both cheeks and the forehead; the middle value wins, so a shadow or shine on one side doesn't.
+    const skins = [205, 425, 151].map(i => sampleMedian(ctx, ...P(i), r)).filter(Boolean);
+    const skin = [0, 1, 2].map(k => skins.map(s => s[k]).sort((a, b) => a - b)[skins.length >> 1]);
+    // Hair: just above the forehead, along the face's own "up".
+    const ux = (top[0] - chin[0]) / faceH, uy = (top[1] - chin[1]) / faceH;
+    const hair = sampleMedian(ctx, top[0] + ux * faceH * 0.1, top[1] + uy * faceH * 0.1, r);
+    fm.skin = nearestIdx(skin, FM.skin);
+    // Hair that looks like skin = bald, shaved or covered: keep the current hair colour.
+    if (hair && Math.abs(lab(hair)[0] - lab(skin)[0]) > 12) fm.hair = nearestIdx(hair, FM.hair);
+    drawFace();
+    $("fmStatus").textContent = t("fmDone");
+  } catch (err) {
+    $("fmStatus").textContent = t("fmFail");
+  } finally { URL.revokeObjectURL(url); }
+}
+
 /* ---------- install gate (iPhone browser tab) ---------- */
 function showInstall() {
   $("installWA").classList.toggle("hide", !inApp);
@@ -1215,6 +1491,9 @@ function boom() {
 addEventListener("online", () => render()); addEventListener("offline", () => render());
 addEventListener("hashchange", () => location.reload());
 
+// Offline shell: lets the home-screen app open with no signal (expenses already sync later via the Firestore cache).
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+
 /* ---------- boot ---------- */
 let booted = false;
 async function boot() {
@@ -1224,7 +1503,12 @@ async function boot() {
   if (isIOS && !standalone && !skippedInstall()) return showInstall();
   if (!booted) { initFirebase(); booted = true; }
   msg('<span class="spin"></span>', t("loading"), "", false);
-  try { await ensureAuth(); } catch { return msg("📡", t("dbErr"), t("needNet"), false); }
+  try { await ensureAuth(); }
+  catch {
+    msg("📡", t("dbErr"), t("needNet"), false);
+    const b = $("msgAct"); b.textContent = t("retry"); b.classList.remove("hide"); b.onclick = () => location.reload();
+    return;
+  }
   if (!TRIP) return showHome();
   if (!/^[A-Za-z0-9_-]{20,40}$/.test(TRIP)) return msg("🧭", t("notFoundTitle"), t("notFoundBody"));
   openTrip();

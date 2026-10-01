@@ -4,6 +4,8 @@ rules_version = '2';
 // A name (person) is locked to one browser (anonymous uid). Only the trip maker can unlock it.
 // An expense belongs to the person who PAID it. The maker can only soft-delete/restore and unlock.
 // Everything closes 14 days after the trip's last activity. Nothing is ever hard-deleted from a client.
+// Backup maker: a friend with no powers until they say the maker lost their phone; after 24h without
+// the maker cancelling, they become the maker. The maker can also hand the role to any joined friend.
 // The maker can delete a trip (deletedAt). Any member can bring it back within 3 days; after that it is
 // closed for good and the weekly cleanup erases it. While deleted, the trip is read-only.
 service cloud.firestore {
@@ -35,8 +37,9 @@ service cloud.firestore {
     }
     function validAvatar(a) {
       return a is map && a.keys().hasOnly(['k', 'v']) && a.keys().hasAll(['k', 'v'])
-        && a.k in ['dice', 'photo'] && str(a.v, 1, 60000)
+        && a.k in ['dice', 'photo', 'face'] && str(a.v, 1, 60000)
         && (a.k == 'dice' ? a.v.matches('^[A-Za-z0-9_-]{1,32}$')
+          : a.k == 'face' ? a.v.matches('^s[0-9]h[0-9]t[0-9]{1,2}b[0-9]g[0-9]m[0-9]$')
                           : a.v.matches('^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$'));
     }
 
@@ -70,6 +73,62 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
           && request.resource.data.deletedAt == request.time
           && request.resource.data.deletedBy == myPerson(t))
+        ||
+        // Backup maker: the first friend to open the trip takes the empty backup slot (only for themself).
+        (writable(resource.data)
+          && resource.data.maker != request.auth.uid
+          && resource.data.get('backup', null) == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['backup'])
+          && request.resource.data.backup == myPerson(t))
+        ||
+        // The maker picks another backup: a friend who has joined, not the maker.
+        (writable(resource.data)
+          && resource.data.maker == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['backup'])
+          && personId(request.resource.data.backup)
+          && get(personPath(t, request.resource.data.backup)).data.uid != null
+          && get(personPath(t, request.resource.data.backup)).data.uid != request.auth.uid)
+        ||
+        // The backup says the maker lost their phone: starts a 24h countdown everyone can see.
+        (writable(resource.data)
+          && resource.data.maker != request.auth.uid
+          && resource.data.get('backup', null) == myPerson(t)
+          && resource.data.get('rescueAt', null) == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rescueAt', 'rescueBy'])
+          && request.resource.data.rescueAt == request.time
+          && request.resource.data.rescueBy == myPerson(t))
+        ||
+        // The maker (or the backup who started it) cancels the countdown.
+        (writable(resource.data)
+          && resource.data.get('rescueAt', null) != null
+          && (resource.data.maker == request.auth.uid || resource.data.get('rescueBy', null) == myPerson(t))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rescueAt', 'rescueBy'])
+          && request.resource.data.rescueAt == null
+          && request.resource.data.rescueBy == null)
+        ||
+        // 24h passed and nobody cancelled: the backup becomes the maker. Joining reopens so the old maker can come back.
+        (writable(resource.data)
+          && resource.data.get('rescueAt', null) != null
+          && request.time > resource.data.rescueAt + duration.value(24, 'h')
+          && resource.data.get('rescueBy', null) == myPerson(t)
+          && resource.data.get('backup', null) == myPerson(t)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['maker', 'backup', 'rescueAt', 'rescueBy', 'open'])
+          && request.resource.data.maker == request.auth.uid
+          && request.resource.data.backup == null
+          && request.resource.data.rescueAt == null
+          && request.resource.data.rescueBy == null
+          && request.resource.data.open == true)
+        ||
+        // The maker hands the role to a friend who has joined; the old maker becomes the backup.
+        (writable(resource.data)
+          && resource.data.maker == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['maker', 'backup', 'rescueAt', 'rescueBy'])
+          && request.resource.data.maker is string
+          && request.resource.data.maker != request.auth.uid
+          && exists(memberPath(t, request.resource.data.maker))
+          && request.resource.data.backup == myPerson(t)
+          && request.resource.data.get('rescueAt', null) == null
+          && request.resource.data.get('rescueBy', null) == null)
         ||
         // Any member brings it back within the 3 days.
         (alive(resource.data)
