@@ -222,6 +222,40 @@ select.field option{color:#000}
 .toast.on{transform:translate(-50%,0)}
 .sync{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin:0 6px;box-shadow:0 0 8px var(--green)}
 .sync.off{background:var(--sun);box-shadow:0 0 8px var(--sun)}
+/* stats */
+.total-wrap{cursor:pointer}
+.statbtn{display:inline-block;margin-top:10px;background:var(--card2);border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--text)}
+.st-h{font-family:var(--head);font-size:18px;margin:22px 0 10px}
+.donut-wrap{display:flex;align-items:center;gap:16px}
+.donut{width:150px;height:150px;flex-shrink:0;position:relative}
+.donut svg{width:100%;height:100%;transform:rotate(-90deg)}
+.donut circle{cursor:pointer;transition:opacity .2s}
+.donut .mid{position:absolute;inset:0;display:grid;place-items:center;text-align:center;pointer-events:none;font-size:12px;color:var(--muted);line-height:1.25}
+.donut .mid b{display:block;font-family:"Baloo 2";font-size:20px;color:var(--text)}
+.legend{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.legend button{display:flex;align-items:center;gap:8px;text-align:start;font-size:13px;padding:4px 6px;border-radius:10px;width:100%}
+.legend button.on{background:var(--card2)}
+.legend i{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.legend span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legend em{font-style:normal;color:var(--muted);direction:ltr}
+.pbar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.pbar img{width:34px;height:34px;border-radius:50%;background:var(--c);object-fit:cover;flex-shrink:0}
+.pbar .bw{flex:1;min-width:0}
+.pbar .bt{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;gap:8px}
+.pbar .bt em{font-style:normal;color:var(--muted);direction:ltr}
+.pbar .track{height:10px;border-radius:4px;background:rgba(255,255,255,.06)}
+.pbar .fill{height:100%;border-radius:4px;background:var(--sun);min-width:4px}
+.who-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.who-row:first-child{border-top:0}
+.who-row img{width:28px;height:28px;border-radius:50%;background:var(--c);object-fit:cover}
+.who-row .grow{flex:1;min-width:0}
+.who-row em{font-style:normal;color:var(--muted);direction:ltr}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fact{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
+.fact small{display:block;color:var(--muted);font-size:12px}
+.fact b{display:block;font-family:"Baloo 2";font-size:20px;line-height:1.2;margin-top:2px;direction:ltr;text-align:start}
+.fact span{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
 /* face maker */
 #faceScreen{z-index:70}
 .fm-big{width:150px;height:150px;border-radius:50%;background:var(--c);margin:4px auto 12px;overflow:hidden}
@@ -251,6 +285,7 @@ select.field option{color:#000}
       <div class="total"><span id="total">0</span><small id="cur"></small></div>
       <div class="sub" id="sub"></div>
       <div class="crew" id="crew"></div>
+      <button class="statbtn" id="statBtn" data-t="statsBtn"></button>
     </div>
   </div>
   <div class="waves">
@@ -307,6 +342,15 @@ select.field option{color:#000}
     <div class="grab"></div>
     <h3><span id="menuTitle"></span><button class="x" data-close>✕</button></h3>
     <div id="menuBody"></div>
+  </div>
+</div>
+
+<!-- stats sheet -->
+<div class="sheet" id="stats">
+  <div class="wrap">
+    <div class="grab"></div>
+    <h3><span data-t="statsTitle"></span><button class="x" data-close>✕</button></h3>
+    <div id="statsBody"></div>
   </div>
 </div>
 
@@ -495,6 +539,10 @@ en: {
   rescueCancelled:"{name} thought you lost your phone. Cancelled ✓", nowMaker:"You're the trip maker now. Unlock {name}'s name so they can come back.",
   handTitle:"Give the maker role to a friend", makeMakerConfirm:"Make {name} the trip maker? You'll become the backup.", madeMaker:"{name} is the trip maker now",
   backupTag:"backup ⭐", makerTag:"trip maker 👑", noJoined:"Nobody else has joined yet.",
+  statsBtn:"📊 Trip stats", statsTitle:"Trip stats 📊", whereWent:"Where the money went", whoPaidMost:"Who paid the most",
+  whoPaidWhat:"Who paid for what", funFacts:"Fun facts", catOther:"Other", biggest:"Biggest expense", busiest:"Busiest day",
+  perPerson:"Per person", expCount:"Expenses", paidPct:"{name} paid {p}", noStats:"Add an expense to see stats.",
+  ofTotal:"of the total",
   undoSettle:"Undo this settlement?", settleUndone:"Settlement undone", dbErr:"Can't reach the database", retry:"Try again",
   agoNow:"just now", agoM:"{n}m ago", agoH:"{n}h ago", agoD:"{n}d ago",
   cat_food:"Food", cat_cafe:"Cafe", cat_transport:"Transport", cat_fuel:"Fuel", cat_activities:"Activities", cat_stay:"Stay", cat_groceries:"Groceries", cat_fun:"Fun", cat_tickets:"Tickets", cat_other:"Other",
@@ -555,6 +603,10 @@ ar: {
   rescueCancelled:"{name} افتكر إن موبايلك ضاع. اتلغى ✓", nowMaker:"إنت صاحب الرحلة دلوقتي. فك قفل اسم {name} عشان يرجع.",
   handTitle:"ادي دور صاحب الرحلة لحد تاني", makeMakerConfirm:"تخلي {name} صاحب الرحلة؟ وإنت هتبقى الاحتياطي.", madeMaker:"{name} بقى صاحب الرحلة",
   backupTag:"احتياطي ⭐", makerTag:"صاحب الرحلة 👑", noJoined:"لسه محدش تاني دخل.",
+  statsBtn:"📊 إحصائيات الرحلة", statsTitle:"إحصائيات الرحلة 📊", whereWent:"الفلوس راحت فين", whoPaidMost:"مين دفع أكتر",
+  whoPaidWhat:"مين دفع في إيه", funFacts:"حقايق ظريفة", catOther:"تاني", biggest:"أكبر مصروف", busiest:"أكتر يوم صرف",
+  perPerson:"على الفرد", expCount:"عدد المصاريف", paidPct:"{name} دفع {p}", noStats:"ضيف مصروف عشان تشوف الإحصائيات.",
+  ofTotal:"من الإجمالي",
   undoSettle:"تلغي التسوية دي؟", settleUndone:"التسوية اتلغت", dbErr:"مش قادرين نوصل للداتا", retry:"جرب تاني",
   agoNow:"دلوقتي", agoM:"من {n} دقيقة", agoH:"من {n} ساعة", agoD:"من {n} يوم",
   cat_food:"أكل", cat_cafe:"كافيه", cat_transport:"مواصلات", cat_fuel:"بنزين", cat_activities:"أنشطة", cat_stay:"سكن", cat_groceries:"سوبرماركت", cat_fun:"فسحة", cat_tickets:"تذاكر", cat_other:"تاني",
@@ -780,6 +832,7 @@ function listenExpenses() {
     expRetry = 0;
     items = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
     render(); firstLoad = false;
+    if ($("stats").classList.contains("on")) drawStats();
   }, () => {
     unsubExp = null;
     if (!me || stopped) return;
@@ -897,6 +950,7 @@ function summaryText() {
 function rerender() {
   if ($("whoScreen").classList.contains("on") && trip) showWho();
   if (!$("main").classList.contains("hide")) render();
+  if ($("stats").classList.contains("on")) drawStats();
   if ($("homeScreen").classList.contains("on")) showHome();
   if ($("createScreen").classList.contains("on")) drawRows();
 }
@@ -1042,7 +1096,7 @@ function animateTotal(to) {
 
 /* ---------- sheets ---------- */
 function openLayer(id) { $("overlay").classList.add("on"); $(id).classList.add("on"); }
-function closeLayers() { $("overlay").classList.remove("on"); $("sheet").classList.remove("on"); $("menu").classList.remove("on"); document.activeElement?.blur(); }
+function closeLayers() { $("overlay").classList.remove("on"); $("sheet").classList.remove("on"); $("menu").classList.remove("on"); $("stats").classList.remove("on"); document.activeElement?.blur(); }
 $("overlay").addEventListener("click", closeLayers);
 document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeLayers));
 
@@ -1376,6 +1430,67 @@ function shareTrip(id, name, fresh = false) {
   show("shareScreen");
   if (fresh) window.confetti?.({ particleCount: 120, spread: 90, origin: { y: .6 } });
 }
+
+/* ---------- trip stats ---------- */
+// Categorical slots (dataviz reference palette, dark steps, validated against the app's dark surface).
+// Top 5 categories by amount get slots 1-5; the rest fold into a grey "Other" so no hue is ever generated.
+const SERIES = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181"], FOLD = "#6f8f97";
+let statSel = -1;
+function drawStats() {
+  const ex = live().filter(x => x.type !== "settle" && x.amount > 0);
+  if (!ex.length) { $("statsBody").innerHTML = `<div class="note">${t("noStats")}</div>`; return; }
+  const cur = trip.currency, total = ex.reduce((a, x) => a + x.amount, 0);
+  const byCat = {}; ex.forEach(x => { byCat[x.cat] = (byCat[x.cat] || 0) + x.amount; });
+  let cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const slices = cats.slice(0, 5).map(([c, v], i) => ({ c, v, color: SERIES[i] }));
+  const rest = cats.slice(5).reduce((a, [, v]) => a + v, 0);
+  if (rest > 0) slices.push({ c: null, v: rest, color: FOLD });
+  const catName = (c) => c ? `${(CATS.find(k => k[0] === c) || CATS[CATS.length - 1])[1]} ${t("cat_" + ((CATS.find(k => k[0] === c) || CATS[CATS.length - 1])[0]))}` : t("catOther");
+  const pct = (v) => Math.round(v / total * 100);
+  // Donut: one circle per slice, drawn with stroke-dasharray; a 2px gap separates slices.
+  const R = 52, C = 2 * Math.PI * R, GAP = slices.length > 1 ? 2 : 0;
+  let off = 0;
+  const segs = slices.map((sl, i) => {
+    const len = Math.max(0, sl.v / total * C - GAP);
+    const el = `<circle r="${R}" cx="70" cy="70" fill="none" stroke="${sl.color}" stroke-width="22" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" data-s="${i}" style="opacity:${statSel < 0 || statSel === i ? 1 : .3}"><title>${esc(catName(sl.c))}: ${fmt(sl.v)} ${cur}</title></circle>`;
+    off += sl.v / total * C; return el;
+  }).join("");
+  const sel = slices[statSel];
+  const mid = sel ? `${esc(catName(sel.c))}<b>${fmt(sel.v)}</b><bdi dir="ltr">${pct(sel.v)}%</bdi> ${t("ofTotal")}` : `${t("total")}<b>${fmt(total)}</b>${cur}`;
+  let h = `<div class="st-h" style="margin-top:4px">${t("whereWent")}</div>
+    <div class="donut-wrap"><div class="donut"><svg viewBox="0 0 140 140">${segs}</svg><div class="mid"><div>${mid}</div></div></div>
+    <div class="legend">${slices.map((sl, i) => `<button class="${statSel === i ? "on" : ""}" data-s="${i}"><i style="background:${sl.color}"></i><span>${esc(catName(sl.c))}</span><em>${pct(sl.v)}%</em></button>`).join("")}</div></div>`;
+  // Who paid the most (one series: one colour, sorted, crown on top).
+  const paid = Object.fromEntries(order.map(p => [p, 0])); ex.forEach(x => { if (x.paidBy in paid) paid[x.paidBy] += x.amount; });
+  const ranked = order.slice().sort((a, b) => paid[b] - paid[a]), top = paid[ranked[0]] || 1;
+  h += `<div class="st-h">${t("whoPaidMost")}</div>` + ranked.map((p, i) => `<div class="pbar">${face(p)}<div class="bw">
+    <div class="bt"><span>${i === 0 && paid[p] > 0 ? "👑 " : ""}${esc(nameOf(p))}</span><em>${fmt(paid[p])} ${cur}</em></div>
+    <div class="track"><div class="fill" style="width:${paid[p] / top * 100}%"></div></div></div></div>`).join("");
+  // Who paid for what: the top payer of each of the top categories.
+  h += `<div class="st-h">${t("whoPaidWhat")}</div><div class="card" style="padding:4px 14px">` + cats.slice(0, 6).map(([c, v]) => {
+    const per = {}; ex.filter(x => x.cat === c).forEach(x => { per[x.paidBy] = (per[x.paidBy] || 0) + x.amount; });
+    const [p, pv] = Object.entries(per).sort((a, b) => b[1] - a[1])[0];
+    return `<div class="who-row">${face(p)}<div class="grow">${esc(catName(c))}<br><small style="color:var(--muted)">${esc(t("paidPct", { name: "\u2068" + nameOf(p) + "\u2069", p: "\u2066" + Math.round(pv / v * 100) + "%\u2069" }))}</small></div><em>${fmt(v)} ${cur}</em></div>`;
+  }).join("") + `</div>`;
+  // Fun facts.
+  const big = ex.reduce((a, x) => x.amount > a.amount ? x : a, ex[0]);
+  const days = {}; ex.forEach(x => { const d = new Date(tsMs(x.ts) || Date.now()).toDateString(); days[d] = (days[d] || 0) + x.amount; });
+  const [bd, bv] = Object.entries(days).sort((a, b) => b[1] - a[1])[0];
+  const bdl = new Date(bd).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", { weekday: "short", day: "numeric", month: "short" });
+  h += `<div class="st-h">${t("funFacts")}</div><div class="facts">
+    <div class="fact"><small>${t("biggest")}</small><b>${fmt(big.amount)}</b><span>${esc(big.desc || t("cat_" + big.cat))} · ${esc(nameOf(big.paidBy))}</span></div>
+    <div class="fact"><small>${t("busiest")}</small><b>${fmt(bv)}</b><span>${esc(bdl)}</span></div>
+    <div class="fact"><small>${t("perPerson")}</small><b>${fmt(total / order.length)}</b><span>${cur}</span></div>
+    <div class="fact"><small>${t("expCount")}</small><b>${ex.length}</b><span>${esc(t("peopleN", { n: order.length }))}</span></div></div>`;
+  $("statsBody").innerHTML = h;
+}
+function openStats() { statSel = -1; drawStats(); openLayer("stats"); }
+$("statBtn").addEventListener("click", (e) => { e.stopPropagation(); openStats(); });
+document.querySelector(".total-wrap").addEventListener("click", (e) => { if (!e.target.closest(".crew img")) openStats(); });
+$("statsBody").addEventListener("click", (e) => {
+  const s = e.target.closest("[data-s]"); if (!s) return;
+  statSel = statSel === +s.dataset.s ? -1 : +s.dataset.s; drawStats();
+});
 
 /* ---------- face maker ---------- */
 let fm = null, fmDone = null;
